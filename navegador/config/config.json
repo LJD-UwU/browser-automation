@@ -1,0 +1,5 @@
+{
+    "mailLogin": "https://example.com/",
+    "NAME_KEY": "username",
+    "PASSWORD_KEY": "password"
+}

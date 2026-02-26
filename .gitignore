@@ -1,0 +1,13 @@
+others/
+.venv/
+drivers/
+.drivers/
+__pycache__/
+
+
+# Omitir cualquier archivo o carpeta de configuración
+pruebas*
+
+# Omitir archivos de log
+*.log
+*.ps1
