@@ -1,5 +1,7 @@
 {
     "mailLogin": "https://example.com/",
     "NAME_KEY": "username",
-    "PASSWORD_KEY": "password"
+    "PASSWORD_KEY": "password",
+    "HIMEX_USERNAME": "your_username_here",
+    "HIMEX_PASSWORD": "your_password_here"
 }

@@ -90,7 +90,14 @@ flows = [
         "steps": "flows/example.json",
         "download_keyword": "report",
         "detect_change": False,
-    }
+    },
+    {
+        "name": "Himex Mail",
+        "login": "flows/himex_mail_login.json",
+        "steps": "flows/himex_mail_download.json",
+        "download_keyword": "attachment",
+        "detect_change": False,
+    },
 ]
 
 

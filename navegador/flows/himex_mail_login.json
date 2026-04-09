@@ -1,0 +1,78 @@
+[
+    {
+        "_comment": "==================== HIMEX MAIL LOGIN FLOW ====================",
+        "_comment_2": "Authenticates into Hisense corporate email via SSO.",
+        "_comment_3": "Uses sso.hisense.com/login/emailLogin.html (Hisense IAM)."
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 1: Open the Hisense SSO email login page",
+        "command": "open",
+        "target": "https://sso.hisense.com/login/emailLogin.html",
+        "value": ""
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 2: Wait for the login form to fully load",
+        "command": "pause",
+        "target": "",
+        "value": "3000"
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 3: Enter the username (email prefix before @)",
+        "_comment_3": "The username field is inside the #username container.",
+        "command": "type",
+        "target": "xpath=//div[@id='username']//input[@placeholder='Username']",
+        "value": "${HIMEX_USERNAME}"
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 4: Select the email domain from the dropdown",
+        "_comment_3": "The domain select element has id='email-domin'.",
+        "_comment_4": "Default is hisense.com. Change value in config if needed.",
+        "command": "click",
+        "target": "id=email-domin",
+        "value": ""
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 5: Brief pause after opening the domain dropdown",
+        "command": "pause",
+        "target": "",
+        "value": "500"
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 6: Select the correct email domain option",
+        "_comment_3": "Clicks the option matching the configured domain.",
+        "command": "click",
+        "target": "xpath=//select[@id='email-domin']/option[@value='hisense.com']",
+        "value": ""
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 7: Enter the password",
+        "command": "type",
+        "target": "xpath=//input[@placeholder='Password']",
+        "value": "${HIMEX_PASSWORD}"
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 8: Click the Sign in button",
+        "command": "click",
+        "target": "id=login-button",
+        "value": ""
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 9: Wait for SSO redirect to complete",
+        "_comment_3": "After login, SSO redirects to mail.hisense.com/coremail/.",
+        "command": "pause",
+        "target": "",
+        "value": "5000"
+    },
+    {
+        "_comment": "==================== END OF LOGIN FLOW ===================="
+    }
+]

@@ -1,0 +1,58 @@
+[
+    {
+        "_comment": "==================== HIMEX MAIL ATTACHMENT DOWNLOAD FLOW ====================",
+        "_comment_2": "Navigates the Coremail inbox and downloads attachments.",
+        "_comment_3": "Assumes login has already been completed via himex_mail_login.json."
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 1: Navigate to the Coremail inbox",
+        "_comment_3": "After SSO login, ensure we are in the inbox view.",
+        "command": "open",
+        "target": "https://mail.hisense.com/coremail/",
+        "value": ""
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 2: Wait for the inbox to fully load",
+        "command": "pause",
+        "target": "",
+        "value": "5000"
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 3: Click on the first unread email that has an attachment",
+        "_comment_3": "Coremail marks emails with attachments using a clip/paperclip icon.",
+        "_comment_4": "This selector targets the first email row containing an attachment indicator.",
+        "command": "click",
+        "target": "xpath=(//tr[contains(@class,'mbox-row') and .//i[contains(@class,'attach')]]//a[contains(@class,'subject')])[1]",
+        "value": ""
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 4: Wait for the email content and attachments to load",
+        "command": "pause",
+        "target": "",
+        "value": "3000"
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 5: Click the 'Download All' button for attachments",
+        "_comment_3": "Coremail displays attachments at the bottom of the reading pane.",
+        "_comment_4": "The 'Download All' link packages all attachments into a zip.",
+        "command": "click",
+        "target": "xpath=//a[contains(@class,'downloadAll') or contains(text(),'Download All') or contains(text(),'Download all')]",
+        "value": ""
+    },
+    {
+        "_comment": "------------------------------------------------------------",
+        "_comment_2": "STEP 6: Wait for the download to start and stabilize",
+        "_comment_3": "The download detection is handled externally by main.py.",
+        "command": "pause",
+        "target": "",
+        "value": "5000"
+    },
+    {
+        "_comment": "==================== END OF DOWNLOAD FLOW ===================="
+    }
+]
