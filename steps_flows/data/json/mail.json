@@ -1,0 +1,32 @@
+[
+  {
+    "command": "open",
+    "target": "https://mail.example.com/login",
+    "value": ""
+  },
+  {
+    "command": "wait",
+    "target": "id=email",
+    "value": "5000"
+  },
+  {
+    "command": "type",
+    "target": "id=email",
+    "value": "${USERNAME}"
+  },
+  {
+    "command": "type",
+    "target": "id=password",
+    "value": "${PASSWORD}"
+  },
+  {
+    "command": "click",
+    "target": "xpath=//button[@type='submit']",
+    "value": ""
+  },
+  {
+    "command": "wait",
+    "target": "id=dashboard",
+    "value": "10000"
+  }
+]

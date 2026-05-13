@@ -1,268 +1,195 @@
-# 🧭 Navegador
+# navegador-automate 🚀
 
-**Navegador** es un motor de automatización de navegador basado en **flujos declarativos en JSON**, diseñado para ejecutar procesos repetitivos en la web de forma **estable, escalable y multiplataforma (Windows / Linux)** usando Selenium y Microsoft Edge.
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Tests](https://img.shields.io/badge/tests-60%2F60-brightgreen)
 
-El objetivo del proyecto es **separar completamente la lógica de automatización del código**, permitiendo que los flujos se definan únicamente con archivos JSON.
+Librería de automatización de navegadores con orquestación de flujos JSON. Sin configuración manual, sin dependencias externas complicadas.
 
----
+## 🎯 Características
 
-## 🚀 Características principales
+- ✅ **BrowserFactory (Builder Pattern)** - Crear navegadores sin configuración
+- ✅ **FlowDefinition** - Definir flujos con JSON
+- ✅ **Executor** - Ejecutar pasos automatizados
+- ✅ **FlowOrchestrator** - Orquestar múltiples flujos
+- ✅ **Ejecución Paralela** - ThreadPoolExecutor integrado
+- ✅ **Multi-OS** - Windows, macOS, Linux
+- ✅ **Multi-Browser** - Firefox, Edge, Chrome, Safari
+- ✅ **Retry Automático** - Manejo de timeouts
+- ✅ **Logging Centralizado** - Con rotación automática
+- ✅ **Variable Interpolation** - ${USERNAME}, ${PASSWORD}, etc
+- ✅ **60 Tests** - 100% path coverage
 
-- ✅ Automatización basada en steps declarativos (JSON)
+## 📦 Instalación
 
-- ✅ Soporte para login reutilizable
-
-- ✅ Detección de cambios en la web antes de descargar
-
-- ✅ Descargas estables (manejo de `(1)`, `(2)`, etc.)
-
-- ✅ Copia/movimiento automático de archivos a carpeta temporal
-
-- ✅ Descarga automática de msedgedriver (sin usar PATH)
-
-- ✅ Compatible con Windows y Linux
-
-- ✅ Arquitectura modular y extensible
-
-- ✅ Logging centralizado
-
-
----
-
-## 📁 Estructura del proyecto
-
-```pl
-navegador/
-├── main.py                 # Orquestador principal
-├── README.md
-├── requirements.txt
-│
-├── navegador/
-│   ├── browser/            # Selenium + Edge
-│   │   ├── browser.py      # Inicia y cierra el navegador
-│   │   ├── executor.py     # Ejecuta pasos JSON
-│   │   ├── detector.py     # Detecta/descarga msedgedriver
-│   │   └── downloader.py  # Descarga driver según versión de Edge
-│   │
-│   ├── flows/              # Flujos declarativos
-│   │   └── example.json
-│   │
-│   ├── filesystem/         # Manejo de archivos
-│   │   ├── paths.py        # Rutas del sistema
-│   │   └── file_utils.py   # Descargas, copias, temporales
-│   │
-│   ├── config/             # Configuración del usuario
-│   │   ├── config.json
-│   │   └── manager.py
-│   │
-│   ├── state/              # Estado persistente
-│   │   └── change_detector.py
-│   │
-│   └── logging/            # Logging centralizado
-│       └── logger.py
-│
-└── drivers/                # msedgedriver descargado automáticamente
+### Desde PyPI (próximamente)
+```bash
+pip install navegador-automate
 ```
 
----
-
-## 🧠 Concepto clave: Flujos declarativos
-
-Un **flow** describe **qué hacer**, no **cómo hacerlo**.
-
-Ejemplo de flujo:
-
-```json
-{
-  "name": "RealTime",
-  "login": "flows/mail.json",
-  "steps": "flows/real_time.json",
-  "download_keyword": "Real-time production report",
-  "detect_change": false
-}
+### Desde el repositorio
+```bash
+git clone https://github.com/LJD-UwU/navegador-automate.git
+cd navegador-automate
+pip install -e .
 ```
 
-### Campos del flow
+### Con dependencias de desarrollo
+```bash
+pip install -e ".[dev]"
+```
 
-| **Campo** |  **Descripción**|
-|-----------|-----------------|
-`name`        |       Nombre del flujo (y del perfil del navegador)
-`login`       |       JSON con pasos de login (opcional)
-`steps`       |       JSON con pasos principales
-`download_keyword`    |       Texto para detectar archivo descargado
-`detect_change`       |        Si se debe validar cambio antes de descargar
-`change_selector`     |       Selector XPath/CSS para detectar cambio
-`path_cambio`         |       Archivo donde se guarda el último valor
+## 🚀 Quick Start
 
----
+### Uso Simple (BrowserFactory)
+```python
+from navegador_automate import BrowserFactory
 
-## 🧾 Formato de pasos JSON
+# Sin Config manual ✅
+browser = BrowserFactory.firefox(headless=False).build()
 
-Cada archivo JSON contiene una lista de pasos:
+browser.open("https://example.com")
+browser.click("xpath=//button[@id='login']")
+browser.type_text("id=email", "user@example.com")
+browser.type_text("id=password", "secret")
+browser.wait_for_element("id=dashboard")
 
+browser.quit()
+```
+
+### Uso con Context Manager
+```python
+from navegador_automate import BrowserContext
+
+with BrowserContext("firefox", headless=False) as browser:
+    browser.open("https://example.com")
+    browser.click("xpath=//button")
+    # Browser auto-closes
+```
+
+### Orquestación de Flujos
+```python
+from navegador_automate import BrowserFactory, FlowOrchestrator
+from steps_flows.flows_config import COMMANDS
+
+browser = BrowserFactory.firefox().build()
+
+orch = FlowOrchestrator(
+    browser,
+    commands=COMMANDS,
+    credentials={
+        "USERNAME": "user@example.com",
+        "PASSWORD": "secret123"
+    }
+)
+
+# Ejecutar flujo simple
+result = orch.run("base")
+print(f"Success: {result['success']}")
+
+# O múltiples en paralelo
+result = orch.run("all")
+
+browser.quit()
+```
+
+## 📋 Builder Pattern
+
+```python
+factory = (
+    BrowserFactory.firefox()
+    .with_headless(True)
+    .with_download_dir("/custom/download/path")
+    .with_profile_dir("/custom/profile/path")
+)
+
+browser = factory.build()
+```
+
+## 🔗 Selectores Soportados
+
+```python
+# XPath
+browser.click("xpath=//button[@id='submit']")
+
+# CSS
+browser.click("css=.button-primary")
+
+# ID
+browser.click("id=submit-btn")
+
+# Name
+browser.click("name=action")
+
+# Class
+browser.click("class=btn")
+
+# Tag
+browser.click("tag=button")
+```
+
+## 🔄 Comandos de Flujos JSON
 
 ```json
 [
-  {
-    "command": "open",
-    "target": "https://example.com",
-    "value": ""
-  },
-  {
-    "command": "click",
-    "target": "xpath=//button[@id='login']",
-    "value": ""
-  },
-  {
-    "command": "type",
-    "target": "id=username",
-    "value": "${USERNAME}"
-  }
+  {"command": "open", "target": "https://example.com", "value": ""},
+  {"command": "type", "target": "id=email", "value": "${USERNAME}"},
+  {"command": "type", "target": "id=password", "value": "${PASSWORD}"},
+  {"command": "click", "target": "xpath=//button[@type='submit']", "value": ""},
+  {"command": "wait", "target": "id=dashboard", "value": "10000"},
+  {"command": "pause", "target": "", "value": "2000"},
+  {"command": "key", "target": "", "value": "ENTER"}
 ]
 ```
 
-### Comandos soportados
-| Comando | Descripción |
-|---------|-------------|
-`open`        |    Navega a una URL
-`click`       |    Click en un elemento
-`type` / `sendKeys`     |    Escribe texto
-`pause`       |   Pausa en ms
-`Teclas`      |   `KEY_ENTER`, `KEY_TAB`, `KEY_ESCAPE`, etc.
+## 📝 Ejemplos
 
-Las variables `${VAR}` se cargan desde `config.json`.
+Ver directorio `steps_flows/` para ejemplos completos:
 
----
-
-## 🔐 Configuración (`config.json`)
-
-Archivo para credenciales y variables:
-
-```json
-{
-  "USERNAME": "usuario",
-  "PASSWORD": "secreto"
-}
-```
-
-Se acceden automáticamente desde los JSON usando `${USERNAME}`.
-
-# 📥 Descargas y archivos temporales
-
-- Las descargas se detectan por keyword
-
-- Si hay múltiples archivos:
-
-    - Se elige el de número más alto `(N)`
-
-    - Se valida que el tamaño sea estable
-
-- El archivo final se mueve o copia a:
-
-    ```plaintext
-    TEMP_DIR = %TEMP%/uppph_daily_temp
-    ```
-
-Esto evita:
-
-- conflictos
-
-- archivos bloqueados
-
-- descargas incompletas
-
----
-
-## 🌐 Navegador y driver
-
-- Se usa Microsoft Edge
-
-- El sistema:
-
-    - detecta la versión instalada
-
-    - descarga el `msedgedriver` exacto
-
-    - lo guarda en `drivers`/
-
-- No se requiere modificar PATH
-
-> ⚠️ Si un flujo descarga archivos, NO se usa headless para garantizar estabilidad.
-
----
-
-## 🔄 Detección de cambios
-
-Para flujos que solo deben ejecutarse si algo cambió:
-
-1. Se lee un valor de la web (XPath/CSS)
-
-2. Se compara contra el último valor guardado
-
-3. Solo si cambia, se ejecuta la descarga
-
-Esto evita:
-
-- descargas innecesarias
-
-- reprocesos
-
-- ruido operativo
-
----
-
-## ▶️ Ejecución
-
-Desde la raíz del proyecto:
+- `basic.py` - Uso simple BrowserFactory
+- `flows_orchestration.py` - Orquestación con flows_config
+- `parallel.py` - Ejecución paralela
+- `custom.py` - Flujos personalizados
 
 ```bash
-python main.py
+cd steps_flows
+
+# Ejecutar ejemplo
+python basic.py
+python flows_orchestration.py
+python parallel.py
+python custom.py
 ```
 
----
+## 🧪 Testing
 
-## 🧪 Recomendaciones de uso
+```bash
+# Ejecutar todos los tests
+pytest
 
-- Usar un flow por proceso
+# Con cobertura
+pytest --cov=navegador_automate
 
-- Reutilizar `login.json`
+# Test específico
+pytest tests/test_factory.py -v
+```
 
-- Evitar selectores frágiles
+## 📚 Documentación Completa
 
-- Probar flows sin headless al inicio
-
-- Mantener los JSON simples
-
----
-
-## 🛣️ Mejoras futuras (roadmap)
-
-- CLI: `python -m navegador run flow.json`
-
-- Ejecución paralela de flows
-
-- Retry policy por paso
-
-- Screenshots en error
-
-- Reportes de ejecución
-
-- Validación de esquema JSON
-
-- Modo `dry-run`
-
----
-
-## 📌 Note del proyecto
-
->[!NOTE]
->El código no cambia.
->Los flujos sí.
-
-Navegador está pensado para que el código sea estable y los procesos evolucionen únicamente editando JSON.
-
----
+- [TAREA 1: Browser + Factory + Drivers](TAREA_1_COMPLETADA.md)
+- [TAREA 2: FlowDefinition + Executor](TAREA_2_COMPLETADA.md)
+- [TAREA 3: FlowOrchestrator](TAREA_3_COMPLETADA.md)
+- [TAREA 4: Flujos + Scripts](TAREA_4_COMPLETADA.md)
+- [TAREA 5: Setup + Docs + CI/CD](TAREA_5_COMPLETADA.md)
 
 ## 📄 Licencia
 
-Este proyecto se distribuye bajo la licencia especificada en el archivo [`LICENSE`](LICENSE "Ver licencia").
+Este proyecto está bajo la licencia MIT. Ver [LICENSE](LICENSE) para más detalles.
+
+## 👤 Autor
+
+- **LJD-UwU** - Desarrollo inicial
+
+---
+
+**Made with ❤️ by LJD-UwU**

@@ -1,0 +1,42 @@
+[
+  {
+    "command": "click",
+    "target": "xpath=//button[@id='reports']",
+    "value": ""
+  },
+  {
+    "command": "wait",
+    "target": "id=report-list",
+    "value": "5000"
+  },
+  {
+    "command": "click",
+    "target": "xpath=//a[contains(text(), 'Loss Time')]",
+    "value": ""
+  },
+  {
+    "command": "pause",
+    "target": "",
+    "value": "2000"
+  },
+  {
+    "command": "click",
+    "target": "xpath=//button[@id='generate']",
+    "value": ""
+  },
+  {
+    "command": "wait",
+    "target": "id=report-ready",
+    "value": "10000"
+  },
+  {
+    "command": "click",
+    "target": "xpath=//button[@id='download']",
+    "value": ""
+  },
+  {
+    "command": "wait",
+    "target": "id=success-message",
+    "value": "5000"
+  }
+]

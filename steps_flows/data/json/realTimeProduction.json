@@ -1,0 +1,32 @@
+[
+  {
+    "command": "click",
+    "target": "xpath=//button[@id='analytics']",
+    "value": ""
+  },
+  {
+    "command": "wait",
+    "target": "id=realtime-dashboard",
+    "value": "5000"
+  },
+  {
+    "command": "click",
+    "target": "xpath=//tab[@data-name='production']",
+    "value": ""
+  },
+  {
+    "command": "pause",
+    "target": "",
+    "value": "1500"
+  },
+  {
+    "command": "click",
+    "target": "xpath=//button[@id='export']",
+    "value": ""
+  },
+  {
+    "command": "wait",
+    "target": "id=export-success",
+    "value": "5000"
+  }
+]

@@ -1,0 +1,112 @@
+[
+    {
+        "command": "open",
+        "target": "${RealTimeProduction}",
+        "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "5000"
+    },
+    {
+        "command": "click",
+        "target": "//*[@id=\"1746695207832\"]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "//*[@id=\"EndDate\"]/div/div/div",
+        "value": ""
+    },
+    {
+        "command": "select_date",
+        "target": "css=.arco-trigger-popup",
+        "value": "${AUTO}"
+    },
+    {
+        "command": "click",
+        "target": "//*[@id=\"StartDate\"]/div/div/div",
+        "value": ""
+    },
+    {
+        "command": "select_date",
+        "target": "css=.arco-trigger-popup",
+        "value": "${AUTO}"
+    },
+    {
+        "command": "click",
+        "target": "//*[@id=\"TimeDimension\"]/div/div/span",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Time slot'])[1]/following::li[1]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='AreaCode']/div/div/span/span[2]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='SMT Area'])[1]/following::span[2]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='PutType']/div/div/span/input",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Input'])[1]/following::li[1]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Product type'])[1]/following::div[7]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='ConditionsOfDimension']/div/div/span/span[2]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Workshop'])[2]/following::div[1]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Line'])[3]/following::div[1]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Work order'])[2]/following::div[1]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Model'])[3]/following::span[2]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "id=1714285476084",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "id=1714285793821",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='1721034705538']/div/div/div/div/div/div/button",
+        "value": ""
+    }
+]
