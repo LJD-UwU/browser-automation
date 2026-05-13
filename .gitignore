@@ -2,7 +2,9 @@ others/
 .venv/
 .drivers/
 __pycache__/
-
+dist/
+build/
+*egg-info*
 
 # Omitir cualquier archivo o carpeta de configuración
 *copy*
