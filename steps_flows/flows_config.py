@@ -1,47 +1,53 @@
-"""
-Flow configurations - Define reusable flows and commands.
-
-This module defines all available flows and commands that can be
-orchestrated using FlowOrchestrator.
-"""
+"""Flow definitions with absolute paths."""
 
 from pathlib import Path
-from navegador_automate import FlowDefinition
 
+DATA_DIR = Path(__file__).parent / "data" / "json"
 
-# Define individual flows
-FLOW_BASE_PLAN = FlowDefinition(
-    name="basePlan",
-    login="steps_flows/data/json/mail.json",
-    steps="steps_flows/data/json/basePlan.json",
-    download_keyword="ZJ",
-)
+if not DATA_DIR.exists():
+    raise FileNotFoundError(f"Data directory not found: {DATA_DIR}")
 
-FLOW_REAL_TIME = FlowDefinition(
-    name="realTime",
-    login="steps_flows/data/json/mail.json",
-    steps="steps_flows/data/json/realTimeProduction.json",
-    download_keyword="Real-time",
-)
+FLOW_BASE_PLAN = {
+    "name": "basePlan",
+    "login": str(DATA_DIR / "mail.json"),
+    "steps": str(DATA_DIR / "basePlan.json"),
+    "download_keyword": "ZJ",
+}
 
-FLOW_LOSS_TIME = FlowDefinition(
-    name="lossTime",
-    login="steps_flows/data/json/mail.json",
-    steps="steps_flows/data/json/lossTime.json",
-    download_keyword="Production",
-)
+FLOW_REAL_TIME = {
+    "name": "realTime",
+    "login": str(DATA_DIR / "mail.json"),
+    "steps": str(DATA_DIR / "realTimeProduction.json"),
+    "download_keyword": "Real-time",
+}
 
-# Define commands - combinations of flows with execution strategy
+FLOW_LOSS_TIME = {
+    "name": "lossTime",
+    "login": str(DATA_DIR / "mail.json"),
+    "steps": str(DATA_DIR / "lossTime.json"),
+    "download_keyword": "Production",
+}
+
+FLOW_TEST = {
+    "name": "test",
+    "steps": str(DATA_DIR / "test.json"),
+    "download_keyword": None,
+}
+
 COMMANDS = {
-    "base": {
+    "test": {
+        "flows": [FLOW_TEST],
+        "parallel": False,
+    },
+    "basePlan": {
         "flows": [FLOW_BASE_PLAN],
         "parallel": False,
     },
-    "real": {
+    "realTime": {
         "flows": [FLOW_REAL_TIME],
         "parallel": False,
     },
-    "loss": {
+    "lossTime": {
         "flows": [FLOW_LOSS_TIME],
         "parallel": False,
     },
@@ -57,4 +63,5 @@ __all__ = [
     "FLOW_REAL_TIME",
     "FLOW_LOSS_TIME",
     "COMMANDS",
+    "DATA_DIR",
 ]

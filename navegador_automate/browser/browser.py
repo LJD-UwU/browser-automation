@@ -32,6 +32,7 @@ class BrowserSession:
         headless: bool = False,
         download_dir: Optional[Path] = None,
         profile_dir: Optional[Path] = None,
+        driver_path: Optional[Path] = None,
     ):
         """
         Initialize browser session.
@@ -41,11 +42,13 @@ class BrowserSession:
             headless: Run in headless mode.
             download_dir: Custom download directory.
             profile_dir: Custom profile directory.
+            driver_path: Custom driver path (optional).
         """
         self.browser_type = browser_type.lower()
         self.headless = headless
         self.download_dir = download_dir or DOWNLOAD_DIR
         self.profile_dir = profile_dir or (PROFILES_DIR / browser_type)
+        self.driver_path = driver_path
         self.driver = None
 
     def launch(self) -> None:
@@ -58,8 +61,11 @@ class BrowserSession:
         try:
             log("BrowserSession", f"Launching {self.browser_type}", level="info")
 
-            detector = DriverDetector(self.browser_type)
-            driver_path = detector.get_driver_path()
+            if self.driver_path:
+                driver_path = self.driver_path
+            else:
+                detector = DriverDetector(self.browser_type)
+                driver_path = detector.get_driver_path()
 
             if self.browser_type == "firefox":
                 self.driver = self._launch_firefox(driver_path)

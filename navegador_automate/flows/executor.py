@@ -1,336 +1,86 @@
-"""Flow executor - executes steps from JSON."""
+"""Flow executor: execute JSON-defined automation steps."""
 
+import json
 import time
-from typing import Dict, Any, List, Optional
 from pathlib import Path
-from selenium.webdriver.remote.webdriver import WebDriver
-from navegador_automate.utils.paths import DOWNLOAD_DIR
-from navegador_automate.flows.definition import FlowDefinition
-from navegador_automate.flows.parser import FlowParser
-from navegador_automate.logger import log
-from navegador_automate.browser.exceptions import (
-    FlowExecutionError,
-    BrowserTimeoutError,
-    SelectorNotFoundError,
-)
+from typing import Dict, Any
+
+from navegador_automate.utils.logger import log
 
 
 class Executor:
-    """Execute browser automation flows."""
+    """Execute automation steps from JSON files."""
 
-    MAX_RETRIES = 3
-    RETRY_DELAY = 1  # seconds
-
-    def __init__(self, driver: WebDriver, download_dir: Optional[Path] = None):
+    def __init__(self, browser_session, name: str, variables: Dict[str, str] = None):
         """
         Initialize executor.
 
         Args:
-            driver: Selenium WebDriver instance.
-            download_dir: Custom download directory.
+            browser_session: BrowserSession instance
+            name: Name for logging
+            variables: Dict of variables to interpolate (${KEY})
         """
-        self.driver = driver
-        self.parser = FlowParser()
-        self.logs: List[str] = []
-        self.download_dir = download_dir or DOWNLOAD_DIR
+        self.session = browser_session
+        self.name = name
+        self.variables = variables or {}
+        self.timeout = 15
 
-    def execute_flow(
-        self,
-        flow: FlowDefinition,
-        credentials: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Execute a complete flow (login + steps).
+    def execute_file(self, json_path: str | Path) -> None:
+        """Execute all steps from JSON file."""
+        json_path = Path(json_path)
+        if not json_path.exists():
+            raise FileNotFoundError(f"JSON file not found: {json_path}")
 
-        Args:
-            flow: FlowDefinition to execute.
-            credentials: Dictionary with USERNAME, PASSWORD, etc.
+        log(self.name, f"Executing: {json_path.name}", level="info")
 
-        Returns:
-            Dictionary with execution results.
-        """
-        self.logs.clear()
-        credentials = credentials or {}
+        with open(json_path, "r", encoding="utf-8") as f:
+            steps = json.load(f)
 
-        try:
-            log("Executor", f"Executing flow: {flow.name}", level="info")
-
-            self._log(f"Starting flow: {flow.name}")
-
-            login_steps = self.parser.load_steps(flow.login)
-            self._log(f"Loaded {len(login_steps)} login steps")
-
-            self.execute_steps(login_steps, credentials)
-            self._log("Login completed successfully")
-
-            main_steps = self.parser.load_steps(flow.steps)
-            self._log(f"Loaded {len(main_steps)} main steps")
-
-            self.execute_steps(main_steps, credentials)
-            self._log("Main steps completed successfully")
-
-            result = {
-                "success": True,
-                "flow_name": flow.name,
-                "logs": self.logs,
-                "downloaded_file": None,
-            }
-
-            if flow.download_keyword:
-                downloaded_file = self._find_downloaded_file(flow.download_keyword)
-                result["downloaded_file"] = str(downloaded_file) if downloaded_file else None
-                self._log(f"Downloaded file: {result['downloaded_file']}")
-
-            log("Executor", f"Flow {flow.name} completed successfully", level="info")
-            return result
-
-        except Exception as e:
-            self._log(f"Error: {str(e)}")
-            log("Executor", f"Flow {flow.name} failed: {e}", level="error")
-
-            return {
-                "success": False,
-                "flow_name": flow.name,
-                "error": str(e),
-                "logs": self.logs,
-                "downloaded_file": None,
-            }
-
-    def execute_steps(
-        self,
-        steps: List[Dict[str, Any]],
-        credentials: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """
-        Execute list of steps.
-
-        Args:
-            steps: List of step dictionaries.
-            credentials: Credentials for interpolation.
-
-        Raises:
-            FlowExecutionError: If any step fails.
-        """
-        credentials = credentials or {}
-
-        for idx, step in enumerate(steps, 1):
+        for i, step in enumerate(steps, 1):
             try:
-                self.parser.validate_step(step)
-                self._execute_step(step, credentials)
-                self._log(f"Step {idx}/{len(steps)}: {step['command']} OK")
-
+                self._execute_step(step)
             except Exception as e:
-                self._log(f"Step {idx}/{len(steps)}: {step['command']} FAILED - {str(e)}")
-                raise FlowExecutionError(f"Step {idx} failed: {e}") from e
+                log(self.name, f"Error at step {i}: {e}", level="error")
+                raise
 
-    def _execute_step(self, step: Dict[str, Any], credentials: Dict[str, Any]) -> None:
-        """
-        Execute a single step.
-
-        Args:
-            step: Step dictionary.
-            credentials: Credentials for interpolation.
-
-        Raises:
-            FlowExecutionError: If step fails.
-        """
+    def _execute_step(self, step: Dict[str, Any]) -> None:
+        """Execute a single step."""
         command = step.get("command", "").lower()
-        target = step.get("target", "")
-        value = step.get("value", "")
+        target = self._replace(step.get("target", ""))
+        value = self._replace(step.get("value", ""))
 
-        target = self.parser.interpolate_value(target, credentials)
-        value = self.parser.interpolate_value(value, credentials)
-
-        log("Executor", f"Executing: {command} {target}", level="debug")
+        log(self.name, f"→ {command}: {target}", level="debug")
 
         if command == "open":
-            self.driver.get(target)
+            self.session.open(target)
 
         elif command == "click":
-            element = self._find_element(target)
-            element.click()
+            self.session.click(target)
 
-        elif command == "type":
-            element = self._find_element(target)
-            element.clear()
-            element.send_keys(value)
+        elif command in ["type", "sendkeys"]:
+            self.session.type_text(target, value)
 
         elif command == "pause":
-            max_scan = None
-            if target and "max_scan=" in target:
-                max_scan = int(target.split("max_scan=")[1])
-            delay = int(value) / 1000
-            time.sleep(delay)
-            if max_scan:
-                self._log(f"Pause with max_scan={max_scan}")
-
-        elif command == "select_option":
-            self._select_option(value)
-
-        elif command == "select_date":
-            self._select_date(target, value)
+            ms = int(value) if value else 1000
+            self.session.pause(ms / 1000)
 
         elif command == "wait":
-            timeout = int(value) / 1000 if value else 10
-            self._wait_for_element(target, timeout)
-
-        elif command == "key":
-            self._press_key(value)
-
-        elif command == "get_text":
-            element = self._find_element(target)
-            text = element.text
-            self._log(f"Got text: {text[:50]}")
-
-        elif command == "get_attribute":
-            element = self._find_element(target)
-            attr_value = element.get_attribute(value)
-            self._log(f"Got attribute: {attr_value}")
-
-        elif command == "check_visible":
-            self._wait_for_element(target, timeout=2)
+            seconds = int(value) if value else 1
+            self.session.pause(float(seconds))
 
         else:
-            raise FlowExecutionError(f"Unknown command: {command}")
+            log(self.name, f"Unknown command: {command}", level="warning")
 
-    def _find_element(self, selector: str):
-        """Find element with retry logic."""
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                selector_type, selector_value = self.parser.parse_selector(selector)
+    def _replace(self, text: str) -> str:
+        """Replace ${KEY} with values from variables dict."""
+        if not isinstance(text, str):
+            return text
 
-                if selector_type == "xpath":
-                    from selenium.webdriver.common.by import By
+        if not text.startswith("${") or not text.endswith("}"):
+            return text
 
-                    return self.driver.find_element(By.XPATH, selector_value)
-                elif selector_type == "css":
-                    from selenium.webdriver.common.by import By
+        key = text[2:-1]
+        if key not in self.variables:
+            raise ValueError(f"Variable not found: {key}")
 
-                    return self.driver.find_element(By.CSS_SELECTOR, selector_value)
-                elif selector_type == "id":
-                    from selenium.webdriver.common.by import By
-
-                    return self.driver.find_element(By.ID, selector_value)
-                else:
-                    from selenium.webdriver.common.by import By
-
-                    return self.driver.find_element(By.XPATH, selector_value)
-
-            except Exception as e:
-                if attempt < self.MAX_RETRIES - 1:
-                    time.sleep(self.RETRY_DELAY)
-                else:
-                    raise SelectorNotFoundError(f"Element not found: {selector}") from e
-
-    def _wait_for_element(self, selector: str, timeout: float = 10) -> None:
-        """Wait for element to appear."""
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-        from selenium.webdriver.common.by import By
-
-        selector_type, selector_value = self.parser.parse_selector(selector)
-
-        if selector_type == "xpath":
-            by = By.XPATH
-        elif selector_type == "css":
-            by = By.CSS_SELECTOR
-        elif selector_type == "id":
-            by = By.ID
-        else:
-            by = By.XPATH
-
-        try:
-            wait = WebDriverWait(self.driver, timeout)
-            wait.until(EC.presence_of_element_located((by, selector_value)))
-        except Exception as e:
-            raise BrowserTimeoutError(f"Element not found: {selector} (timeout: {timeout}s)") from e
-
-    def _press_key(self, key_name: str) -> None:
-        """Press a keyboard key."""
-        from selenium.webdriver.common.keys import Keys
-
-        key_map = {
-            "ENTER": Keys.ENTER,
-            "TAB": Keys.TAB,
-            "ESCAPE": Keys.ESCAPE,
-            "SPACE": Keys.SPACE,
-            "DELETE": Keys.DELETE,
-            "BACKSPACE": Keys.BACKSPACE,
-        }
-
-        key = key_map.get(key_name.upper())
-        if not key:
-            raise FlowExecutionError(f"Unknown key: {key_name}")
-
-        self.driver.switch_to.active_element.send_keys(key)
-
-    def _find_downloaded_file(self, keyword: str) -> Optional[Path]:
-        """
-        Find downloaded file by keyword in name.
-
-        Args:
-            keyword: Keyword to search in filename.
-
-        Returns:
-            Path to downloaded file or None.
-        """
-        try:
-            if not self.download_dir.exists():
-                self._log(f"Download directory does not exist: {self.download_dir}")
-                return None
-
-            for file in self.download_dir.glob("*"):
-                if file.is_file() and keyword.lower() in file.name.lower():
-                    self._log(f"Found downloaded file: {file.name}")
-                    return file
-
-            self._log(f"No downloaded file found with keyword: {keyword}")
-            return None
-
-        except Exception as e:
-            log("Executor", f"Error finding downloaded file: {e}", level="warning")
-            return None
-
-    def _select_option(self, value: str) -> None:
-        """Select option (for dropdowns and selects)."""
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import Select
-
-        if value.upper() == "${AUTO}":
-            try:
-                select_element = self.driver.find_element(By.TAG_NAME, "select")
-                select = Select(select_element)
-                options = select.options
-                if len(options) > 1:
-                    select.select_by_index(1)
-                self._log(f"Selected first option automatically")
-            except Exception:
-                self._log("No select element found, trying dropdown")
-                time.sleep(0.5)
-        else:
-            try:
-                from selenium.webdriver.support.ui import Select
-                select_element = self.driver.find_element(By.TAG_NAME, "select")
-                select = Select(select_element)
-                select.select_by_value(value)
-                self._log(f"Selected option: {value}")
-            except Exception as e:
-                raise FlowExecutionError(f"Failed to select option: {e}") from e
-
-    def _select_date(self, target: str, value: str) -> None:
-        """Select date from date picker."""
-        if value.upper() == "${AUTO}":
-            try:
-                selector_type, selector_value = self.parser.parse_selector(target)
-                element = self._find_element(target)
-                element.click()
-                time.sleep(0.5)
-                self._log(f"Date picker opened")
-            except Exception as e:
-                raise FlowExecutionError(f"Failed to select date: {e}") from e
-        else:
-            self._log(f"Select date with value: {value}")
-
-    def _log(self, message: str) -> None:
-        """Add message to logs."""
-        self.logs.append(message)
+        return self.variables[key]

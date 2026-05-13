@@ -1,107 +1,80 @@
-"""BrowserFactory: Builder pattern for BrowserSession creation."""
+"""BrowserFactory: Builder pattern for browser creation."""
 
 from pathlib import Path
 from typing import Optional
-from navegador_automate.browser.browser import BrowserSession
-from navegador_automate.logger import log
+
+from navegador_automate.browser.session import BrowserSession
+from navegador_automate.utils.logger import log
 
 
 class BrowserFactory:
-    """Factory for creating BrowserSession instances using builder pattern."""
+    """Factory for creating BrowserSession instances."""
 
     def __init__(self, browser_type: str):
-        """
-        Initialize factory.
-
-        Args:
-            browser_type: Browser type (firefox, edge, chrome, safari).
-        """
         self._browser_type = browser_type
         self._headless = False
         self._download_dir: Optional[Path] = None
         self._profile_dir: Optional[Path] = None
-
-    @staticmethod
-    def firefox() -> "BrowserFactory":
-        """Create Firefox factory."""
-        log("BrowserFactory", "Creating Firefox factory", level="debug")
-        return BrowserFactory("firefox")
+        self._driver_path: Optional[Path] = None
 
     @staticmethod
     def edge() -> "BrowserFactory":
         """Create Edge factory."""
-        log("BrowserFactory", "Creating Edge factory", level="debug")
         return BrowserFactory("edge")
 
     @staticmethod
     def chrome() -> "BrowserFactory":
         """Create Chrome factory."""
-        log("BrowserFactory", "Creating Chrome factory", level="debug")
         return BrowserFactory("chrome")
 
     @staticmethod
-    def safari() -> "BrowserFactory":
-        """Create Safari factory."""
-        log("BrowserFactory", "Creating Safari factory", level="debug")
-        return BrowserFactory("safari")
+    def firefox() -> "BrowserFactory":
+        """Create Firefox factory."""
+        return BrowserFactory("firefox")
 
     def with_headless(self, enabled: bool = True) -> "BrowserFactory":
-        """
-        Enable headless mode.
-
-        Args:
-            enabled: Whether to run headless.
-
-        Returns:
-            Self for chaining.
-        """
+        """Set headless mode."""
         self._headless = enabled
-        log("BrowserFactory", f"Headless mode: {enabled}", level="debug")
         return self
 
     def with_download_dir(self, directory: Path | str) -> "BrowserFactory":
-        """
-        Set custom download directory.
-
-        Args:
-            directory: Directory path.
-
-        Returns:
-            Self for chaining.
-        """
-        self._download_dir = Path(directory)
-        log("BrowserFactory", f"Download dir: {self._download_dir}", level="debug")
+        """Set download directory."""
+        self._download_dir = Path(directory) if isinstance(directory, str) else directory
         return self
 
     def with_profile_dir(self, directory: Path | str) -> "BrowserFactory":
+        """Set profile directory."""
+        self._profile_dir = Path(directory) if isinstance(directory, str) else directory
+        return self
+
+    def with_driver_path(self, path: Path | str) -> "BrowserFactory":
+        """Set driver path."""
+        self._driver_path = Path(path) if isinstance(path, str) else path
+        return self
+
+    def view_window(self, visible: bool = True) -> "BrowserFactory":
         """
-        Set custom profile directory.
+        Control browser window visibility.
 
         Args:
-            directory: Directory path.
+            visible: True to show window, False to hide (headless mode)
 
         Returns:
-            Self for chaining.
+            self (for method chaining)
         """
-        self._profile_dir = Path(directory)
-        log("BrowserFactory", f"Profile dir: {self._profile_dir}", level="debug")
+        self._headless = not visible
         return self
 
     def build(self) -> BrowserSession:
-        """
-        Build and launch BrowserSession.
-
-        Returns:
-            Configured BrowserSession.
-        """
-        log("BrowserFactory", f"Building {self._browser_type} session", level="info")
+        """Build and launch browser."""
+        log("BrowserFactory", f"Building {self._browser_type}", level="info")
 
         session = BrowserSession(
             browser_type=self._browser_type,
             headless=self._headless,
             download_dir=self._download_dir,
             profile_dir=self._profile_dir,
+            driver_path=self._driver_path,
         )
-
         session.launch()
         return session
