@@ -18,6 +18,25 @@ class CommandConfig:
     max_workers: int = 5
 
 
+class _RunProxy:
+    """Proxy for dynamic run.commandName() syntax."""
+
+    def __init__(self, orchestrator: "FlowOrchestrator"):
+        self.orchestrator = orchestrator
+
+    def __call__(self, command_name: str) -> Dict[str, Any]:
+        """Allow run('commandName') syntax."""
+        return self.orchestrator._execute_command(command_name)
+
+    def __getattr__(self, name: str) -> callable:
+        """Allow run.commandName() syntax."""
+        if name == "all":
+            return self.orchestrator._run_all_commands
+        if name in self.orchestrator.commands:
+            return lambda: self.orchestrator._execute_command(name)
+        raise AttributeError(f"Command not found: {name}")
+
+
 class FlowOrchestrator:
     """Orchestrate execution of multiple flows."""
 
@@ -40,34 +59,7 @@ class FlowOrchestrator:
         self.credentials = credentials or {}
         self.commands = self._parse_commands(commands or {})
         self.results: Dict[str, Any] = {}
-
-    def run(self, command_name: str) -> Dict[str, Any]:
-        """
-        Execute a predefined command.
-
-        Args:
-            command_name: Name of command from COMMANDS dict.
-
-        Returns:
-            Execution results dictionary.
-
-        Raises:
-            ValueError: If command not found.
-        """
-        if command_name not in self.commands:
-            raise ValueError(f"Command not found: {command_name}")
-
-        config = self.commands[command_name]
-        log(
-            "FlowOrchestrator",
-            f"Running command: {command_name} (parallel={config.parallel})",
-            level="info",
-        )
-
-        if config.parallel:
-            return self._run_parallel(command_name, config.flows)
-        else:
-            return self._run_sequence(command_name, config.flows)
+        self.run = _RunProxy(self)
 
     def run_flow(
         self,
@@ -317,3 +309,19 @@ class FlowOrchestrator:
                     )
 
         return result
+
+    def _execute_command(self, command_name: str) -> Dict[str, Any]:
+        """Execute a command by name."""
+        if command_name not in self.commands:
+            raise ValueError(f"Command not found: {command_name}")
+        config = self.commands[command_name]
+        log("FlowOrchestrator", f"Running command: {command_name}", level="info")
+        if config.parallel:
+            return self._run_parallel(command_name, config.flows)
+        else:
+            return self._run_sequence(command_name, config.flows)
+
+    def _run_all_commands(self) -> Dict[str, Any]:
+        """Execute all commands sequentially."""
+        log("FlowOrchestrator", f"Running all {len(self.commands)} commands", level="info")
+        return self.run_sequence(list(self.commands.keys()))

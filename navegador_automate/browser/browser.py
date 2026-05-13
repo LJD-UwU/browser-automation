@@ -293,6 +293,14 @@ class BrowserSession:
             self.driver.quit()
             log("BrowserSession", "Browser closed", level="info")
 
+    def __enter__(self) -> "BrowserSession":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit."""
+        self.quit()
+
     def _find_element(self, selector: str):
         """
         Find element by selector.

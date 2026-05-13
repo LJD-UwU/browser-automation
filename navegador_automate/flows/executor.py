@@ -153,8 +153,19 @@ class Executor:
             element.send_keys(value)
 
         elif command == "pause":
-            delay = int(value) / 1000  # value in milliseconds
+            max_scan = None
+            if target and "max_scan=" in target:
+                max_scan = int(target.split("max_scan=")[1])
+            delay = int(value) / 1000
             time.sleep(delay)
+            if max_scan:
+                self._log(f"Pause with max_scan={max_scan}")
+
+        elif command == "select_option":
+            self._select_option(value)
+
+        elif command == "select_date":
+            self._select_date(target, value)
 
         elif command == "wait":
             timeout = int(value) / 1000 if value else 10
@@ -274,6 +285,46 @@ class Executor:
         except Exception as e:
             log("Executor", f"Error finding downloaded file: {e}", level="warning")
             return None
+
+    def _select_option(self, value: str) -> None:
+        """Select option (for dropdowns and selects)."""
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import Select
+
+        if value.upper() == "${AUTO}":
+            try:
+                select_element = self.driver.find_element(By.TAG_NAME, "select")
+                select = Select(select_element)
+                options = select.options
+                if len(options) > 1:
+                    select.select_by_index(1)
+                self._log(f"Selected first option automatically")
+            except Exception:
+                self._log("No select element found, trying dropdown")
+                time.sleep(0.5)
+        else:
+            try:
+                from selenium.webdriver.support.ui import Select
+                select_element = self.driver.find_element(By.TAG_NAME, "select")
+                select = Select(select_element)
+                select.select_by_value(value)
+                self._log(f"Selected option: {value}")
+            except Exception as e:
+                raise FlowExecutionError(f"Failed to select option: {e}") from e
+
+    def _select_date(self, target: str, value: str) -> None:
+        """Select date from date picker."""
+        if value.upper() == "${AUTO}":
+            try:
+                selector_type, selector_value = self.parser.parse_selector(target)
+                element = self._find_element(target)
+                element.click()
+                time.sleep(0.5)
+                self._log(f"Date picker opened")
+            except Exception as e:
+                raise FlowExecutionError(f"Failed to select date: {e}") from e
+        else:
+            self._log(f"Select date with value: {value}")
 
     def _log(self, message: str) -> None:
         """Add message to logs."""

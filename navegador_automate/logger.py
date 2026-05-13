@@ -1,7 +1,8 @@
-"""Centralized logging for navegador-automate."""
+"""Minimalist logging for navegador-automate."""
 
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from typing import Optional
@@ -11,30 +12,13 @@ def setup_logger(
     name: str = "navegador_automate",
     level: int = logging.INFO,
     log_file: Optional[Path] = None,
-    max_bytes: int = 10 * 1024 * 1024,
-    backup_count: int = 5,
 ) -> logging.Logger:
-    """
-    Configure and return a logger with file + stdout handlers.
-
-    Args:
-        name: Logger name.
-        level: Logging level (default: INFO).
-        log_file: Path to log file. If None, only stdout.
-        max_bytes: Max log file size before rotation (default: 10MB).
-        backup_count: Number of backup files to keep (default: 5).
-
-    Returns:
-        Configured logger instance.
-    """
+    """Configure logger with minimalist format."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.handlers.clear()
 
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    formatter = logging.Formatter("%(message)s")
 
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(level)
@@ -43,9 +27,7 @@ def setup_logger(
 
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=max_bytes, backupCount=backup_count
-        )
+        file_handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5)
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
@@ -56,32 +38,31 @@ def setup_logger(
 _default_logger = setup_logger()
 
 
-def log(component: str, message: str, level: str = "info", secure: bool = False) -> None:
-    """
-    Log a message without exposing passwords.
+def _get_timestamp() -> str:
+    """Get current time in HH:MM:SS format."""
+    return datetime.now().strftime("%H:%M:%S")
 
-    Args:
-        component: Component name (e.g., "BrowserFactory", "Executor").
-        message: Message to log.
-        level: Log level ("debug", "info", "warning", "error").
-        secure: If True, mask sensitive values in message.
-    """
+
+def log(component: str, message: str, level: str = "info", secure: bool = False) -> None:
+    """Log message in minimalist format like macro.py."""
     if secure:
         message = _mask_sensitive_data(message)
 
-    log_message = f"[{component}] {message}"
+    tag_map = {"debug": "DBUG", "info": "INFO", "warning": "WARN", "error": "ERR"}
+    tag = tag_map.get(level, "INFO")
+    timestamp = _get_timestamp()
+
+    log_message = f"[{tag}] [{timestamp}] {message}"
     getattr(_default_logger, level)(log_message)
 
 
 def _mask_sensitive_data(message: str) -> str:
-    """Mask passwords and sensitive values in log messages."""
-    sensitive_keywords = ["password", "token", "secret", "api_key", "credential"]
+    """Mask passwords and sensitive values."""
+    keywords = ["password", "token", "secret", "api_key", "credential"]
     masked = message
-
-    for keyword in sensitive_keywords:
+    for keyword in keywords:
         if keyword.lower() in masked.lower():
             masked = masked.replace("=", "=***")
-
     return masked
 
 
