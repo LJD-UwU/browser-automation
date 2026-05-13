@@ -11,3 +11,31 @@ pruebas*
 # Omitir archivos de log
 *.log
 *.ps1
+*copy*
+*temp*
+*test*
+*prubate*
+*prueba*
+# Omitir archivos de base de datos
+*.db
+# Omitir archivos de caché
+*.cache
+# Omitir archivos de configuración de entorno
+.env
+# Omitir archivos de configuración de editor
+.vscode/
+.idea/
+# Omitir archivos de configuración de sistema
+.DS_Store
+# Omitir archivos de configuración de Python
+*.pyc
+# Omitir archivos de configuración de Jupyter
+.ipynb_checkpoints/
+# Omitir archivos de configuración de Docker
+.docker/
+# Omitir archivos de configuración de Kubernetes
+.kube/
+# Omitir archivos de configuración de Terraform
+.terraform/
+# Omitir archivos de configuración de Ansible
+.ansible/
