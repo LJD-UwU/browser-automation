@@ -186,7 +186,18 @@ class DriverDetector:
         return get_driver_cache_path(self.browser, version, self.os_name) / driver_name
 
     def _get_fallback_driver(self) -> Path:
-        """Get driver using webdriver-manager fallback."""
+        """Get driver using webdriver-manager fallback with offline support."""
+        # First, try to find locally installed driver
+        local_driver = self._find_system_driver()
+        if local_driver:
+            log(
+                "DriverDetector",
+                f"Found system driver: {local_driver}",
+                level="info",
+            )
+            return local_driver
+
+        # Then try webdriver-manager
         try:
             from webdriver_manager.firefox import GeckoDriverManager
             from webdriver_manager.chrome import ChromeDriverManager
@@ -211,8 +222,47 @@ class DriverDetector:
             )
             return Path(driver_path)
 
-        except ImportError:
-            raise DriverNotFoundError(
-                "webdriver-manager not installed. "
-                "Install with: pip install webdriver-manager"
+        except (ImportError, Exception) as e:
+            log(
+                "DriverDetector",
+                f"webdriver-manager failed: {e}",
+                level="warning",
             )
+            raise DriverNotFoundError(
+                f"Could not get driver for {self.browser}: {e}"
+            )
+
+    def _find_system_driver(self) -> Path:
+        """Find locally installed driver in system PATH or common locations."""
+        import shutil
+
+        driver_names = {
+            "firefox": "geckodriver",
+            "chrome": "chromedriver",
+            "edge": "msedgedriver",
+            "safari": "safaridriver",
+        }
+
+        driver_name = driver_names.get(self.browser)
+        if not driver_name:
+            return None
+
+        if self.os_name == "windows":
+            driver_name += ".exe"
+
+        # Try to find in PATH
+        path_driver = shutil.which(driver_name)
+        if path_driver:
+            return Path(path_driver)
+
+        # Try common Windows locations for Edge
+        if self.browser == "edge" and self.os_name == "windows":
+            common_paths = [
+                Path("C:\\Program Files\\Microsoft\\Edge\\Application\\msedgedriver.exe"),
+                Path("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedgedriver.exe"),
+            ]
+            for path in common_paths:
+                if path.exists():
+                    return path
+
+        return None

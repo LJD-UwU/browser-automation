@@ -4,6 +4,7 @@ import time
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from selenium.webdriver.remote.webdriver import WebDriver
+from navegador_automate.utils.paths import DOWNLOAD_DIR
 from navegador_automate.flows.definition import FlowDefinition
 from navegador_automate.flows.parser import FlowParser
 from navegador_automate.logger import log
@@ -20,16 +21,18 @@ class Executor:
     MAX_RETRIES = 3
     RETRY_DELAY = 1  # seconds
 
-    def __init__(self, driver: WebDriver):
+    def __init__(self, driver: WebDriver, download_dir: Optional[Path] = None):
         """
         Initialize executor.
 
         Args:
             driver: Selenium WebDriver instance.
+            download_dir: Custom download directory.
         """
         self.driver = driver
         self.parser = FlowParser()
         self.logs: List[str] = []
+        self.download_dir = download_dir or DOWNLOAD_DIR
 
     def execute_flow(
         self,
@@ -271,11 +274,13 @@ class Executor:
         Returns:
             Path to downloaded file or None.
         """
-        from navegador_automate.utils.paths import DOWNLOAD_DIR
-
         try:
-            for file in DOWNLOAD_DIR.glob("*"):
-                if keyword.lower() in file.name.lower():
+            if not self.download_dir.exists():
+                self._log(f"Download directory does not exist: {self.download_dir}")
+                return None
+
+            for file in self.download_dir.glob("*"):
+                if file.is_file() and keyword.lower() in file.name.lower():
                     self._log(f"Found downloaded file: {file.name}")
                     return file
 

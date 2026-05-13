@@ -36,8 +36,8 @@ class FlowDefinition:
         if not self.steps:
             raise ValueError("Steps path cannot be empty")
 
-        login_path = Path(self.login)
-        steps_path = Path(self.steps)
+        login_path = self._resolve_path(self.login)
+        steps_path = self._resolve_path(self.steps)
 
         if not login_path.exists():
             raise FileNotFoundError(f"Login file not found: {self.login}")
@@ -46,6 +46,30 @@ class FlowDefinition:
 
         if self.detect_change and not self.change_selector:
             raise ValueError("change_selector required when detect_change=True")
+
+    def _resolve_path(self, file_path: str) -> Path:
+        """Resolve file path, checking relative and package-relative paths."""
+        path = Path(file_path)
+
+        if path.is_absolute() or path.exists():
+            return path
+
+        try:
+            import steps_flows
+            steps_flows_dir = Path(steps_flows.__file__).parent
+
+            if file_path.startswith("steps_flows/"):
+                relative_path = file_path[len("steps_flows/"):]
+                package_path = steps_flows_dir / relative_path
+            else:
+                package_path = steps_flows_dir / file_path
+
+            if package_path.exists():
+                return package_path
+        except (ImportError, AttributeError):
+            pass
+
+        return path
 
     def __repr__(self) -> str:
         """Return flow representation."""

@@ -55,7 +55,7 @@ class FlowOrchestrator:
             credentials: Credentials for flow execution (USERNAME, PASSWORD, etc).
         """
         self.browser = browser
-        self.executor = Executor(browser.driver)
+        self.executor = Executor(browser.driver, download_dir=browser.download_dir)
         self.credentials = credentials or {}
         self.commands = self._parse_commands(commands or {})
         self.results: Dict[str, Any] = {}

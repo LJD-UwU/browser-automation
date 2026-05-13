@@ -73,6 +73,8 @@ class FlowParser:
             "get_text",
             "get_attribute",
             "check_visible",
+            "select_option",
+            "select_date",
         ]
 
         if command not in valid_commands:
