@@ -4,15 +4,10 @@ flows_config.py
 Define los flujos de automatización y el mapa de COMMANDS para FlowOrchestrator.
 
 Las variables ${...} en los JSON de pasos se resuelven desde:
-  1. steps_flows/data/json/config.json  (URLs y credenciales)
-  2. credentials= pasado a FlowOrchestrator (override en runtime)
+  1. steps_flows/config.py  →  dict CONFIG  (URLs y credenciales)
+  2. credentials= pasado a FlowOrchestrator  (override en runtime)
 
-Variables en config.json:
-    mailLogin           URL del portal de correo/login
-    BasePlan            URL de la app BasePlan
-    RealTimeProduction  URL del reporte Real Time
-    NAME_KEY            Usuario
-    PASSWORD_KEY        Contraseña
+Para configurar el proyecto edita  steps_flows/config.py.
 """
 
 from pathlib import Path

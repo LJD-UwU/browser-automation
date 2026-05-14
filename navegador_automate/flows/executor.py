@@ -1,20 +1,18 @@
 """Flow executor: execute JSON-defined automation steps.
 
 Variables ${KEY} en los pasos JSON se resuelven desde:
-  1. El dict `variables` pasado al constructor (credenciales de FlowOrchestrator)
-  2. config.json en la raíz del proyecto que llama a la librería
+  1. steps_flows/config.py  →  dict CONFIG  (URLs, credenciales, etc.)
+  2. credentials= pasado a FlowOrchestrator  (override en runtime)
 
-config.json tiene prioridad MENOR que las credenciales pasadas directamente,
-permitiendo override en tiempo de ejecución sin tocar el archivo.
+Las credenciales pasadas directamente tienen prioridad sobre config.py.
 """
 
 import json
-import os
 import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -24,42 +22,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from navegador_automate.utils.logger import log
 
 
-# ── Resolución de config.json ─────────────────────────────────────────────────
+# ── Carga de configuración desde steps_flows/config.py ───────────────────────
 
-def _find_config_json() -> Optional[Path]:
+def _load_config() -> Dict[str, str]:
     """
-    Busca config.json en varias ubicaciones conocidas, en orden de prioridad:
-      1. steps_flows/data/json/config.json  (ubicación preferida)
-      2. config.json en la raíz del proyecto
-      3. backend/config/config.json  (compatibilidad con Ejemplo)
+    Importa CONFIG desde steps_flows.config y lo devuelve.
+    Si el módulo no existe o no tiene CONFIG, devuelve {}.
     """
-    current = Path.cwd()
-    for parent in [current] + list(current.parents):
-        # 1. Ubicación preferida: steps_flows/data/json/config.json
-        candidate = parent / "steps_flows" / "data" / "json" / "config.json"
-        if candidate.exists():
-            return candidate
-        # 2. Raíz del proyecto
-        candidate = parent / "config.json"
-        if candidate.exists():
-            return candidate
-        # 3. Compatibilidad con estructura del Ejemplo
-        candidate = parent / "backend" / "config" / "config.json"
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def _load_config_json() -> Dict[str, str]:
-    """Carga config.json y devuelve su contenido como dict (vacío si no existe)."""
-    path = _find_config_json()
-    if not path:
-        return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception:
+        from steps_flows.config import CONFIG  # type: ignore[import]
+        return dict(CONFIG) if isinstance(CONFIG, dict) else {}
+    except ImportError:
         return {}
 
 
@@ -128,12 +101,12 @@ class Executor:
         self.name = name
         self.timeout = 15
 
-        # Combinar config.json (base) + variables explícitas (override)
-        config = _load_config_json()
+        # Combinar config.py (base) + variables explícitas (override)
+        config = _load_config()
         self.variables = {**config, **(variables or {})}
 
         if config:
-            log(self.name, f"Config cargado desde config.json ({len(config)} variables)", level="debug")
+            log(self.name, f"Config cargado desde steps_flows/config.py ({len(config)} variables)", level="debug")
 
     # ── Ejecución de archivos ─────────────────────────────────────────────────
 
@@ -357,7 +330,7 @@ class Executor:
         if key not in self.variables:
             raise ValueError(
                 f"Variable '${{{key}}}' no encontrada. "
-                f"Agrégala a config.json o pásala en credentials al FlowOrchestrator."
+                f"Agrégala a steps_flows/config.py en el dict CONFIG."
             )
         return self.variables[key]
 
