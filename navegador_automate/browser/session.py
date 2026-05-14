@@ -152,15 +152,40 @@ class BrowserSession:
         log("BrowserSession", f"Opened: {url}", level="debug")
 
     def click(self, selector: str) -> None:
-        """Click element."""
+        """Click element with enhanced handling for visibility and obstruction issues."""
         element = self._find_element(selector)
-        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
-        time.sleep(0.2)
+
+        # 1. Scroll into view with center positioning
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", element)
+        time.sleep(0.3)
+
+        # 2. Wait for element to be in stable position (animations/transitions complete)
+        self._wait_for_stable_element(element)
+
+        # 3. Check if element is not obscured by other elements
+        is_clickable = self._is_element_clickable(element)
+
+        # 4. Try native click first
+        if is_clickable:
+            try:
+                element.click()
+                log("BrowserSession", f"Clicked (native): {selector}", level="debug")
+                return
+            except Exception as e:
+                log("BrowserSession", f"Native click failed, trying JS fallback: {e}", level="debug")
+
+        # 5. Fallback: Use JavaScript click (bypasses visibility checks)
         try:
-            element.click()
-        except Exception:
             self.driver.execute_script("arguments[0].click();", element)
-        log("BrowserSession", f"Clicked: {selector}", level="debug")
+            log("BrowserSession", f"Clicked (JS fallback): {selector}", level="debug")
+        except Exception as e:
+            # 6. Last resort: dispatch click event
+            self.driver.execute_script(
+                "const event = new MouseEvent('click', {bubbles: true, cancelable: true}); "
+                "arguments[0].dispatchEvent(event);",
+                element
+            )
+            log("BrowserSession", f"Clicked (event dispatch): {selector}", level="debug")
 
     def type_text(self, selector: str, text: str) -> None:
         """Type text into element."""
@@ -196,6 +221,84 @@ class BrowserSession:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.quit()
+
+    def _wait_for_stable_element(self, element, max_attempts: int = 5, wait_ms: int = 100) -> None:
+        """Wait for element to be in stable position (animations/transitions complete).
+
+        Checks if element position hasn't changed between consecutive checks,
+        indicating that animations/transitions have completed.
+        """
+        previous_rect = None
+        stable_count = 0
+        required_stable_checks = 2
+
+        for attempt in range(max_attempts):
+            try:
+                current_rect = self.driver.execute_script(
+                    "const rect = arguments[0].getBoundingClientRect(); "
+                    "return {x: rect.x, y: rect.y, width: rect.width, height: rect.height};",
+                    element
+                )
+
+                if previous_rect is None:
+                    previous_rect = current_rect
+                elif current_rect == previous_rect:
+                    stable_count += 1
+                    if stable_count >= required_stable_checks:
+                        return
+                else:
+                    stable_count = 0
+                    previous_rect = current_rect
+
+                time.sleep(wait_ms / 1000)
+            except Exception:
+                return
+
+    def _is_element_clickable(self, element) -> bool:
+        """Check if element is truly clickable (visible and not obscured).
+
+        Returns True if:
+        - Element is visible (display != 'none' and visibility != 'hidden')
+        - Element is not obscured by other elements (z-index check)
+        - Element is not behind a modal/overlay
+        """
+        try:
+            # Check if element is visible
+            is_displayed = self.driver.execute_script(
+                "const elem = arguments[0]; "
+                "const style = window.getComputedStyle(elem); "
+                "return style.display !== 'none' && style.visibility !== 'hidden' && "
+                "       style.opacity !== '0' && elem.offsetHeight > 0 && elem.offsetWidth > 0;",
+                element
+            )
+
+            if not is_displayed:
+                return False
+
+            # Check if element is obscured by checking element at click point
+            center_x, center_y = self.driver.execute_script(
+                "const rect = arguments[0].getBoundingClientRect(); "
+                "return [rect.left + rect.width / 2, rect.top + rect.height / 2];",
+                element
+            )
+
+            element_at_point = self.driver.execute_script(
+                "return document.elementFromPoint(arguments[0], arguments[1]);",
+                center_x, center_y
+            )
+
+            # Check if the element at the click point is our element or a child of it
+            is_not_obscured = self.driver.execute_script(
+                "return arguments[0].contains(arguments[1]) || arguments[0] === arguments[1];",
+                element,
+                element_at_point
+            )
+
+            return bool(is_not_obscured)
+
+        except Exception as e:
+            log("BrowserSession", f"Error checking if element is clickable: {e}", level="debug")
+            return True  # Assume clickable if check fails
 
     def _find_element(self, selector: str):
         """Find element by selector."""

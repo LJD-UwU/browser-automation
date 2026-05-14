@@ -15,6 +15,7 @@ Librería de automatización de navegadores con orquestación de flujos JSON. Si
 - ✅ **Ejecución Paralela** - ThreadPoolExecutor integrado
 - ✅ **Multi-OS** - Windows, macOS, Linux
 - ✅ **Multi-Browser** - Firefox, Edge, Chrome, Safari
+- ✅ **Enhanced Click Handler** - Maneja elementos con obstáculos, z-index, animaciones
 - ✅ **Retry Automático** - Manejo de timeouts
 - ✅ **Logging Centralizado** - Con rotación automática
 - ✅ **Variable Interpolation** - ${USERNAME}, ${PASSWORD}, etc

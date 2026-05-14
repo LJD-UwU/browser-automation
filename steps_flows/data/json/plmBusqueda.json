@@ -26,8 +26,18 @@
     },
     {
         "command": "waitForElementPresent",
-        "target": "xpath=//div[@id='table']/div/div[2]/div/div/div/div/div/span",
+        "target": "xpath=//label[@id='switch-view-button']/span",
         "value": ""
+    },
+    {
+        "command":"click",
+        "target":"xpath=//label[@id='switch-view-button']/span",
+        "value":""
+    },
+    {
+        "command":"click",
+        "target":"/html/body/ul[2]/li[4]/span",
+        "value":""
     },
     {
         "command": "click",
