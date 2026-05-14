@@ -1,0 +1,47 @@
+[
+    {
+        "command": "open",
+        "target": "${plmBusqueda}",
+        "value": ""
+    },
+    {
+        "command": "waitForElementPresent",
+        "target": "xpath=//input[@type='text']",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=//input[@type='text']",
+        "value": ""
+    },
+    {
+        "command": "type",
+        "target": "xpath=//input[@type='text']",
+        "value": "N2606AL"
+    },
+    {
+        "command":"click",
+        "target":"xpath=//div[@id='global_ctn_search']/div[2]/div[2]/div[2]/div",
+        "value":""
+    },
+    {
+        "command": "waitForElementPresent",
+        "target": "xpath=//div[@id='table']/div/div[2]/div/div/div/div/div/span",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='table']/div/div[2]/div/div/div/div/div/span",
+        "value": ""
+    },
+    {
+        "command": "waitForElementPresent",
+        "target": "id=action_NewOpen",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "id=action_NewOpen",
+        "value": ""
+    }
+]

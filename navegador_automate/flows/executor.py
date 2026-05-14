@@ -169,6 +169,9 @@ class Executor:
                 log(self.name, f"wait: ignorando selector '{target}' (no implementado)", level="debug")
                 self.session.pause(1)
 
+        elif command == "waitforelementpresent":
+            self.wait_for_element_present(target)
+
         elif command == "select_date":
             # target = selector del popup, value = "YYYY-MM-DD" o "${AUTO}"
             resolved_value = self._replace(value_raw)
@@ -308,6 +311,28 @@ class Executor:
             raise Exception(f"Elemento <li> no encontrado para '{best}'")
         self._click_option_el(el)
         log(self.name, f"Opción auto-seleccionada: '{best}'")
+
+    # ── Wait for Element ──────────────────────────────────────────────────────
+
+    def wait_for_element_present(self, selector: str, timeout: int = None):
+        """Espera a que un elemento esté presente en el DOM (existe pero puede no ser visible).
+
+        Args:
+            selector: selector en formato "xpath=...", "id=...", "css=...", etc.
+            timeout: segundos para esperar (default: self.timeout)
+        """
+        if timeout is None:
+            timeout = self.timeout
+
+        by, value = self._parse_selector(selector)
+        log(self.name, f"Esperando elemento presente: {selector}", level="debug")
+
+        wait = WebDriverWait(self.session.driver, timeout)
+        try:
+            wait.until(EC.presence_of_element_located((by, value)))
+            log(self.name, f"Elemento encontrado: {selector}", level="debug")
+        except Exception as e:
+            raise Exception(f"waitForElementPresent timeout ({timeout}s): {selector}\n{e}")
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

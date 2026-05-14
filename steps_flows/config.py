@@ -13,6 +13,7 @@ CONFIG = {
     "mailLogin":          "https://mail.hisense.com/",
     "BasePlan":           "https://ovsaps.hisense.com/planManageMent/planQuickPhoto",
     "RealTimeProduction": "https://mom.hisense.com/mom_pc/MESRouter/V9DEflJyVn",
+    "plmBusqueda":        "https://plm.hisense.com/3dspace/common/emxNavigator.jsp",
 
     # ── Credenciales ──────────────────────────────────────────────────────────
     "NAME_KEY":     "danira.miranda",

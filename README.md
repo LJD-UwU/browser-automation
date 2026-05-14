@@ -144,12 +144,26 @@ browser.click("tag=button")
   {"command": "open", "target": "https://example.com", "value": ""},
   {"command": "type", "target": "id=email", "value": "${USERNAME}"},
   {"command": "type", "target": "id=password", "value": "${PASSWORD}"},
+  {"command": "waitForElementPresent", "target": "xpath=//button[@type='submit']", "value": ""},
   {"command": "click", "target": "xpath=//button[@type='submit']", "value": ""},
   {"command": "wait", "target": "id=dashboard", "value": "10000"},
   {"command": "pause", "target": "", "value": "2000"},
   {"command": "key", "target": "", "value": "ENTER"}
 ]
 ```
+
+**Comandos Disponibles:**
+- `open` - Abre una URL
+- `type` / `sendkeys` - Escribe texto en un campo
+- `click` - Hace clic en un elemento
+- `waitForElementPresent` - Espera a que un elemento esté presente en el DOM
+- `wait` - Pausa genérica (ms o espera a elemento)
+- `pause` - Pausa en milisegundos
+- `key` - Envía una tecla especial (ENTER, TAB, ESCAPE, etc)
+- `select_option` - Selecciona opción de dropdown (Ant Design)
+- `select_date` - Selecciona fecha en calendario (Arco)
+
+📖 Ver [WAITFORELEMENTPRESENT.md](WAITFORELEMENTPRESENT.md) para detalles del comando `waitForElementPresent`.
 
 ## 📝 Ejemplos
 

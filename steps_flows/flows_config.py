@@ -37,6 +37,12 @@ FLOW_REAL_TIME = {
     "download_keyword": "Real-time production report",
 }
 
+FLOW_PLM_BUSQUEDA = {
+    "name":             "plmBusqueda",
+    "login":            str(DATA_DIR / "mail.json"),
+    "steps":            str(DATA_DIR / "plmBusqueda.json")
+}
+
 FLOW_LOSS_TIME = {
     "name":             "lossTime",
     "login":            str(DATA_DIR / "mail.json"),
@@ -54,6 +60,10 @@ COMMANDS: Dict[str, Dict[str, Any]] = {
     },
     "realTime": {
         "flows":    [FLOW_REAL_TIME],
+        "parallel": False,
+    },
+    "plmBusqueda": {
+        "flows":    [FLOW_PLM_BUSQUEDA],
         "parallel": False,
     },
     "lossTime": {
