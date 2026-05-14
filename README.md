@@ -72,38 +72,47 @@ with BrowserContext("firefox", headless=False) as browser:
 from navegador_automate import BrowserFactory, FlowOrchestrator
 from steps_flows.flows_config import COMMANDS
 
-browser = BrowserFactory.firefox().build()
+with BrowserFactory.edge() \
+    .with_download_dir("/downloads") \
+    .view_window(True) \
+    .build() as browser:
 
-orch = FlowOrchestrator(
-    browser,
-    commands=COMMANDS,
-    credentials={
-        "USERNAME": "user@example.com",
-        "PASSWORD": "secret123"
-    }
-)
+    orch = FlowOrchestrator(
+        browser,
+        commands=COMMANDS,
+        credentials={
+            "USERNAME": "user@example.com",
+            "PASSWORD": "secret123"
+        }
+    )
 
-# Ejecutar flujo simple
-result = orch.run("base")
-print(f"Success: {result['success']}")
-
-# O múltiples en paralelo
-result = orch.run("all")
-
-browser.quit()
+    result = orch.run.basePlan()
 ```
 
 ## 📋 Builder Pattern
 
 ```python
 factory = (
-    BrowserFactory.firefox()
-    .with_headless(True)
-    .with_download_dir("/custom/download/path")
-    .with_profile_dir("/custom/profile/path")
+    BrowserFactory.edge()
+    .view_window(True)           # Show/hide window
+    .with_download_dir("/path")  # Custom download folder
+    .with_profile_dir("/path")   # Custom profile folder
 )
 
 browser = factory.build()
+```
+
+### Window Visibility
+
+```python
+# Show window (default)
+BrowserFactory.edge().view_window(True).build()
+
+# Hide window (headless mode)
+BrowserFactory.edge().view_window(False).build()
+
+# Equivalent: use with_headless()
+BrowserFactory.edge().with_headless(False).build()
 ```
 
 ## 🔗 Selectores Soportados

@@ -16,52 +16,58 @@ class BrowserFactory:
         self._download_dir: Optional[Path] = None
         self._profile_dir: Optional[Path] = None
         self._driver_path: Optional[Path] = None
+        self._drivers_dir: Optional[Path] = None
 
     @staticmethod
     def edge() -> "BrowserFactory":
-        """Create Edge factory."""
         return BrowserFactory("edge")
 
     @staticmethod
     def chrome() -> "BrowserFactory":
-        """Create Chrome factory."""
         return BrowserFactory("chrome")
 
     @staticmethod
     def firefox() -> "BrowserFactory":
-        """Create Firefox factory."""
         return BrowserFactory("firefox")
 
     def with_headless(self, enabled: bool = True) -> "BrowserFactory":
-        """Set headless mode."""
         self._headless = enabled
         return self
 
-    def with_download_dir(self, directory: Path | str) -> "BrowserFactory":
-        """Set download directory."""
-        self._download_dir = Path(directory) if isinstance(directory, str) else directory
+    def with_download_dir(self, directory) -> "BrowserFactory":
+        """Set download directory for browser file downloads."""
+        self._download_dir = Path(directory)
         return self
 
-    def with_profile_dir(self, directory: Path | str) -> "BrowserFactory":
-        """Set profile directory."""
-        self._profile_dir = Path(directory) if isinstance(directory, str) else directory
+    def with_profile_dir(self, directory) -> "BrowserFactory":
+        self._profile_dir = Path(directory)
         return self
 
-    def with_driver_path(self, path: Path | str) -> "BrowserFactory":
-        """Set driver path."""
-        self._driver_path = Path(path) if isinstance(path, str) else path
+    def with_driver_path(self, path) -> "BrowserFactory":
+        """Set an explicit driver executable path (skips auto-detection)."""
+        self._driver_path = Path(path)
+        return self
+
+    def with_drivers_dir(self, directory) -> "BrowserFactory":
+        """
+        Set the directory where WebDriver binaries will be downloaded and cached.
+
+        By default, navegador_automate detects the calling project's root directory
+        and creates a 'drivers/' subfolder there.  Use this method to override that
+        location explicitly.
+
+        Example::
+
+            BrowserFactory.edge() \\
+                .with_drivers_dir(r"C:\\MyProject\\drivers") \\
+                .with_download_dir(DOWNLOAD_DIR) \\
+                .build()
+        """
+        self._drivers_dir = Path(directory)
         return self
 
     def view_window(self, visible: bool = True) -> "BrowserFactory":
-        """
-        Control browser window visibility.
-
-        Args:
-            visible: True to show window, False to hide (headless mode)
-
-        Returns:
-            self (for method chaining)
-        """
+        """Control browser window visibility."""
         self._headless = not visible
         return self
 
@@ -75,6 +81,7 @@ class BrowserFactory:
             download_dir=self._download_dir,
             profile_dir=self._profile_dir,
             driver_path=self._driver_path,
+            drivers_dir=self._drivers_dir,
         )
         session.launch()
         return session

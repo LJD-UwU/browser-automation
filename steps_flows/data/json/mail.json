@@ -1,32 +1,42 @@
 [
-  {
-    "command": "open",
-    "target": "https://mail.example.com/login",
-    "value": ""
-  },
-  {
-    "command": "wait",
-    "target": "id=email",
-    "value": "5000"
-  },
-  {
-    "command": "type",
-    "target": "id=email",
-    "value": "${USERNAME}"
-  },
-  {
-    "command": "type",
-    "target": "id=password",
-    "value": "${PASSWORD}"
-  },
-  {
-    "command": "click",
-    "target": "xpath=//button[@type='submit']",
-    "value": ""
-  },
-  {
-    "command": "wait",
-    "target": "id=dashboard",
-    "value": "10000"
-  }
+    {
+        "command": "open",
+        "target": "${mailLogin}",
+        "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "1000"
+    },
+    {
+        "command": "click",
+        "target": "xpath=//input[@name='']",
+        "value": ""
+    },
+    {
+        "command": "type",
+        "target": "xpath=//input[@name='']",
+        "value": "${NAME_KEY}"
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[2]/div/div[2]/input",
+        "value": ""
+    },
+    {
+        "command": "type",
+        "target": "xpath=//div[2]/div/div[2]/input",
+        "value": "${PASSWORD_KEY}"
+    },
+    {
+        "command": "click",
+        "target": "id=login-button",
+        "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "1000"
+    }
 ]

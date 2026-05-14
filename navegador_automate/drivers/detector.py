@@ -1,6 +1,8 @@
 """Driver detector: locate or download WebDriver binaries."""
 
 from pathlib import Path
+from typing import Optional
+
 from navegador_automate.drivers.manager import DriverManager
 from navegador_automate.utils.logger import log
 
@@ -8,9 +10,9 @@ from navegador_automate.utils.logger import log
 class DriverDetector:
     """Detect and provide WebDriver for the specified browser."""
 
-    def __init__(self, browser: str):
+    def __init__(self, browser: str, drivers_dir: Optional[Path] = None):
         self.browser = browser.lower()
-        self.manager = DriverManager(browser)
+        self.manager = DriverManager(browser, drivers_dir=drivers_dir)
 
     def get_driver_path(self) -> Path:
         """Get path to WebDriver executable (download if necessary)."""

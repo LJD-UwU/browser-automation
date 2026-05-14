@@ -1,42 +1,32 @@
 [
-  {
-    "command": "click",
-    "target": "xpath=//button[@id='reports']",
-    "value": ""
-  },
-  {
-    "command": "wait",
-    "target": "id=report-list",
-    "value": "5000"
-  },
-  {
-    "command": "click",
-    "target": "xpath=//a[contains(text(), 'Loss Time')]",
-    "value": ""
-  },
-  {
-    "command": "pause",
-    "target": "",
-    "value": "2000"
-  },
-  {
-    "command": "click",
-    "target": "xpath=//button[@id='generate']",
-    "value": ""
-  },
-  {
-    "command": "wait",
-    "target": "id=report-ready",
-    "value": "10000"
-  },
-  {
-    "command": "click",
-    "target": "xpath=//button[@id='download']",
-    "value": ""
-  },
-  {
-    "command": "wait",
-    "target": "id=success-message",
-    "value": "5000"
-  }
+    {
+        "command": "click",
+        "target": "id=lyfullsearch",
+        "value": ""
+    },
+    {
+        "command": "type",
+        "target": "id=lyfullsearch",
+        "value": "himex.pfa"
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)=concat('Mail contains ', '\"', 'himex.pfa', '\"', '')])[1]/following::li[1]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=(.//*[normalize-space(text()) and normalize-space(.)='HIMEX PFA'])[1]/following::td[2]",
+        "value": ""
+    },
+    {
+        "command": "click",
+        "target": "xpath=//a[@rel='download']",
+        "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "1000"
+    }
 ]

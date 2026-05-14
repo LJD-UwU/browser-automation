@@ -1,22 +1,95 @@
-"""Driver manager: download and manage WebDriver binaries."""
+"""Driver manager: download and manage WebDriver binaries.
 
-import platform
-import subprocess
-import re
-import requests
-import zipfile
+Drivers are stored in:
+  1. A custom path provided via environment variable NAV_DRIVERS_DIR, OR
+  2. The calling project's directory (detected via inspect.stack), OR
+  3. A platform-specific user data directory as fallback.
+"""
+
+import inspect
 import io
+import os
+import platform
+import re
+import subprocess
+import zipfile
 from pathlib import Path
+from typing import Optional
+
+import requests
 
 from navegador_automate.utils.logger import log
+
+
+def _detect_project_dir() -> Path:
+    """
+    Walk the call stack to find the outermost caller that is NOT inside
+    the navegador_automate package itself. That file's parent directory
+    is treated as the 'project root'. Falls back to CWD.
+    """
+    lib_marker = "navegador_automate"
+    for frame_info in reversed(inspect.stack()):
+        filename = frame_info.filename
+        if not filename or filename == "<string>":
+            continue
+        p = Path(filename).resolve()
+        if lib_marker in str(p):
+            continue
+        if "site-packages" in str(p) or ("lib" + os.sep + "python") in str(p):
+            continue
+        return p.parent
+    return Path.cwd()
+
+
+def _get_drivers_dir() -> Path:
+    """
+    Return the directory where driver binaries should be stored.
+
+    Priority:
+    1. NAV_DRIVERS_DIR environment variable
+    2. <project_root>/drivers
+    3. Platform user data dir fallback
+    """
+    env_path = os.environ.get("NAV_DRIVERS_DIR")
+    if env_path:
+        p = Path(env_path)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    project_dir = _detect_project_dir()
+    drivers_dir = project_dir / "drivers"
+    try:
+        drivers_dir.mkdir(parents=True, exist_ok=True)
+        return drivers_dir
+    except OSError:
+        pass
+
+    system = platform.system()
+    if system == "Windows":
+        base = Path(os.getenv("APPDATA", Path.home() / "AppData" / "Roaming"))
+    elif system == "Darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path.home() / ".local" / "share"
+
+    fallback = base / "navegador-automate" / "drivers"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
 
 
 class DriverManager:
     """Manage WebDriver binaries for Edge, Chrome, Firefox."""
 
-    def __init__(self, browser: str):
+    def __init__(self, browser: str, drivers_dir: Optional[Path] = None):
         self.browser = browser.lower()
         self.system = platform.system()
+        self._drivers_dir = drivers_dir
+
+    @property
+    def drivers_dir(self) -> Path:
+        if self._drivers_dir is not None:
+            return self._drivers_dir
+        return _get_drivers_dir()
 
     def get_driver_path(self) -> Path:
         """Get or download the appropriate WebDriver."""
@@ -29,13 +102,14 @@ class DriverManager:
         else:
             raise ValueError(f"Unsupported browser: {self.browser}")
 
+    # ── Edge ────────────────────────────────────────────────────────────────
+
     def _get_edge_driver(self) -> Path:
-        """Get or download MSEdgeDriver."""
-        drivers_dir = Path(__file__).parent / "binaries"
-        drivers_dir.mkdir(parents=True, exist_ok=True)
+        dest_dir = self.drivers_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
 
         driver_name = "msedgedriver.exe" if self.system == "Windows" else "msedgedriver"
-        driver_path = drivers_dir / driver_name
+        driver_path = dest_dir / driver_name
 
         if driver_path.exists():
             log("DriverManager", f"Found cached Edge driver: {driver_path}", level="info")
@@ -43,47 +117,14 @@ class DriverManager:
 
         log("DriverManager", "Downloading MSEdgeDriver...", level="info")
         version = self._get_edge_version()
-        return self._download_edge_driver(version, drivers_dir)
-
-    def _get_chrome_driver(self) -> Path:
-        """Get or download ChromeDriver."""
-        drivers_dir = Path(__file__).parent / "binaries"
-        drivers_dir.mkdir(parents=True, exist_ok=True)
-
-        driver_name = "chromedriver.exe" if self.system == "Windows" else "chromedriver"
-        driver_path = drivers_dir / driver_name
-
-        if driver_path.exists():
-            log("DriverManager", f"Found cached Chrome driver: {driver_path}", level="info")
-            return driver_path
-
-        log("DriverManager", "Downloading ChromeDriver...", level="info")
-        version = self._get_chrome_version()
-        return self._download_chrome_driver(version, drivers_dir)
-
-    def _get_firefox_driver(self) -> Path:
-        """Get or download GeckoDriver."""
-        drivers_dir = Path(__file__).parent / "binaries"
-        drivers_dir.mkdir(parents=True, exist_ok=True)
-
-        driver_name = "geckodriver.exe" if self.system == "Windows" else "geckodriver"
-        driver_path = drivers_dir / driver_name
-
-        if driver_path.exists():
-            log("DriverManager", f"Found cached Firefox driver: {driver_path}", level="info")
-            return driver_path
-
-        log("DriverManager", "Downloading GeckoDriver...", level="info")
-        return self._download_firefox_driver(drivers_dir)
+        return self._download_edge_driver(version, dest_dir)
 
     def _get_edge_version(self) -> str:
-        """Get installed Edge version."""
         try:
             if self.system == "Windows":
                 output = subprocess.check_output(
                     ["reg", "query", r"HKEY_CURRENT_USER\Software\Microsoft\Edge\BLBeacon", "/v", "version"],
-                    stderr=subprocess.DEVNULL,
-                    text=True,
+                    stderr=subprocess.DEVNULL, text=True,
                 )
                 match = re.search(r"(\d+\.\d+\.\d+\.\d+)", output)
                 if match:
@@ -96,16 +137,59 @@ class DriverManager:
         except Exception as e:
             log("DriverManager", f"Could not detect Edge version: {e}", level="warning")
 
-        return "latest"
+        raise RuntimeError(
+            "Could not detect Edge version. Ensure Edge is installed or set NAV_DRIVERS_DIR "
+            "and place msedgedriver manually."
+        )
+
+    def _download_edge_driver(self, version: str, dest_dir: Path) -> Path:
+        if self.system == "Windows":
+            url = f"https://msedgedriver.microsoft.com/{version}/edgedriver_win64.zip"
+        elif self.system == "Linux":
+            url = f"https://msedgedriver.microsoft.com/{version}/edgedriver_linux64.zip"
+        else:
+            raise RuntimeError(f"Unsupported OS: {self.system}")
+
+        log("DriverManager", f"Downloading MSEdgeDriver {version} from {url}", level="info")
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+
+        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+            z.extractall(dest_dir)
+
+        driver_name = "msedgedriver.exe" if self.system == "Windows" else "msedgedriver"
+        driver_path = dest_dir / driver_name
+
+        if not driver_path.exists():
+            raise RuntimeError(f"MSEdgeDriver not found after extraction in {dest_dir}")
+
+        driver_path.chmod(0o755)
+        log("DriverManager", f"Downloaded MSEdgeDriver {version} to {driver_path}", level="info")
+        return driver_path
+
+    # ── Chrome ───────────────────────────────────────────────────────────────
+
+    def _get_chrome_driver(self) -> Path:
+        dest_dir = self.drivers_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        driver_name = "chromedriver.exe" if self.system == "Windows" else "chromedriver"
+        driver_path = dest_dir / driver_name
+
+        if driver_path.exists():
+            log("DriverManager", f"Found cached Chrome driver: {driver_path}", level="info")
+            return driver_path
+
+        log("DriverManager", "Downloading ChromeDriver...", level="info")
+        version = self._get_chrome_version()
+        return self._download_chrome_driver(version, dest_dir)
 
     def _get_chrome_version(self) -> str:
-        """Get installed Chrome version."""
         try:
             if self.system == "Windows":
                 output = subprocess.check_output(
                     ["reg", "query", r"HKEY_CURRENT_USER\Software\Google\Chrome\BLBeacon", "/v", "version"],
-                    stderr=subprocess.DEVNULL,
-                    text=True,
+                    stderr=subprocess.DEVNULL, text=True,
                 )
                 match = re.search(r"(\d+\.\d+\.\d+\.\d+)", output)
                 if match:
@@ -117,88 +201,83 @@ class DriverManager:
                     return match.group(1)
         except Exception as e:
             log("DriverManager", f"Could not detect Chrome version: {e}", level="warning")
-
         return "latest"
 
-    def _download_edge_driver(self, version: str, dest_dir: Path) -> Path:
-        """Download MSEdgeDriver for specific version."""
-        if version == "latest":
-            version = "latest"
-
+    def _download_chrome_driver(self, version: str, dest_dir: Path) -> Path:
         if self.system == "Windows":
-            url = f"https://msedgedriver.microsoft.com/{version}/edgedriver_win64.zip"
+            url = (f"https://googlechromelabs.github.io/chrome-for-testing/"
+                   f"latest/chrome-for-testing/{version}/win64/chromedriver-{version}.zip")
         elif self.system == "Linux":
-            url = f"https://msedgedriver.microsoft.com/{version}/edgedriver_linux64.zip"
+            url = (f"https://googlechromelabs.github.io/chrome-for-testing/"
+                   f"latest/chrome-for-testing/{version}/linux64/chromedriver-{version}.zip")
         else:
             raise RuntimeError(f"Unsupported OS: {self.system}")
 
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=60)
         response.raise_for_status()
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as z:
             z.extractall(dest_dir)
 
-        driver_name = "msedgedriver.exe" if self.system == "Windows" else "msedgedriver"
+        driver_name = "chromedriver.exe" if self.system == "Windows" else "chromedriver"
         driver_path = dest_dir / driver_name
-        driver_path.chmod(0o755)
+        if not driver_path.exists():
+            for found in dest_dir.rglob(driver_name):
+                driver_path = found
+                break
 
-        log("DriverManager", f"Downloaded MSEdgeDriver {version} to {driver_path}", level="info")
+        driver_path.chmod(0o755)
+        log("DriverManager", f"Downloaded ChromeDriver {version} to {driver_path}", level="info")
         return driver_path
 
-    def _download_chrome_driver(self, version: str, dest_dir: Path) -> Path:
-        """Download ChromeDriver for specific version."""
-        if version == "latest":
-            version = "latest"
+    # ── Firefox ──────────────────────────────────────────────────────────────
 
-        if self.system == "Windows":
-            url = f"https://googlechromelabs.github.io/chrome-for-testing/latest/chrome-for-testing/{version}/win64/chromedriver-{version}.zip"
-        elif self.system == "Linux":
-            url = f"https://googlechromelabs.github.io/chrome-for-testing/latest/chrome-for-testing/{version}/linux64/chromedriver-{version}.zip"
-        else:
-            raise RuntimeError(f"Unsupported OS: {self.system}")
+    def _get_firefox_driver(self) -> Path:
+        dest_dir = self.drivers_dir
+        dest_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
+        driver_name = "geckodriver.exe" if self.system == "Windows" else "geckodriver"
+        driver_path = dest_dir / driver_name
 
-            with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-                z.extractall(dest_dir)
-
-            driver_name = "chromedriver.exe" if self.system == "Windows" else "chromedriver"
-            driver_path = dest_dir / driver_name
-            driver_path.chmod(0o755)
-
-            log("DriverManager", f"Downloaded ChromeDriver {version} to {driver_path}", level="info")
+        if driver_path.exists():
+            log("DriverManager", f"Found cached Firefox driver: {driver_path}", level="info")
             return driver_path
-        except Exception as e:
-            log("DriverManager", f"ChromeDriver download failed: {e}", level="error")
-            raise
+
+        log("DriverManager", "Downloading GeckoDriver...", level="info")
+        return self._download_firefox_driver(dest_dir)
 
     def _download_firefox_driver(self, dest_dir: Path) -> Path:
-        """Download GeckoDriver (latest version)."""
+        GECKO_VERSION = "0.35.0"
+
         if self.system == "Windows":
-            url = "https://github.com/mozilla/geckodriver/releases/download/v0.35.0/geckodriver-v0.35.0-win64.zip"
+            url = f"https://github.com/mozilla/geckodriver/releases/download/v{GECKO_VERSION}/geckodriver-v{GECKO_VERSION}-win64.zip"
+            is_zip = True
         elif self.system == "Linux":
-            url = "https://github.com/mozilla/geckodriver/releases/download/v0.35.0/geckodriver-v0.35.0-linux64.tar.gz"
+            url = f"https://github.com/mozilla/geckodriver/releases/download/v{GECKO_VERSION}/geckodriver-v{GECKO_VERSION}-linux64.tar.gz"
+            is_zip = False
         elif self.system == "Darwin":
-            url = "https://github.com/mozilla/geckodriver/releases/download/v0.35.0/geckodriver-v0.35.0-macos.tar.gz"
+            url = f"https://github.com/mozilla/geckodriver/releases/download/v{GECKO_VERSION}/geckodriver-v{GECKO_VERSION}-macos.tar.gz"
+            is_zip = False
         else:
             raise RuntimeError(f"Unsupported OS: {self.system}")
 
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, timeout=60)
         response.raise_for_status()
 
-        if self.system == "Windows":
+        if is_zip:
             with zipfile.ZipFile(io.BytesIO(response.content)) as z:
                 z.extractall(dest_dir)
         else:
             import tarfile
-            with tarfile.open(fileobj=io.BytesIO(response.content)) as t:
+            with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as t:
                 t.extractall(dest_dir)
 
         driver_name = "geckodriver.exe" if self.system == "Windows" else "geckodriver"
         driver_path = dest_dir / driver_name
-        driver_path.chmod(0o755)
 
-        log("DriverManager", f"Downloaded GeckoDriver to {driver_path}", level="info")
+        if not driver_path.exists():
+            raise RuntimeError(f"GeckoDriver not found after extraction in {dest_dir}")
+
+        driver_path.chmod(0o755)
+        log("DriverManager", f"Downloaded GeckoDriver v{GECKO_VERSION} to {driver_path}", level="info")
         return driver_path

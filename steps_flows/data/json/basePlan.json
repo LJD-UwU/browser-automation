@@ -1,32 +1,47 @@
 [
-  {
-    "command": "click",
-    "target": "xpath=//button[@id='reports']",
-    "value": ""
-  },
-  {
-    "command": "wait",
-    "target": "id=report-list",
-    "value": "5000"
-  },
-  {
-    "command": "click",
-    "target": "xpath=//a[contains(text(), 'Base Plan')]",
-    "value": ""
-  },
-  {
-    "command": "pause",
-    "target": "",
-    "value": "2000"
-  },
-  {
-    "command": "click",
-    "target": "xpath=//button[@id='download']",
-    "value": ""
-  },
-  {
-    "command": "wait",
-    "target": "id=success-message",
-    "value": "5000"
-  }
+    {
+        "command": "open",
+        "target": "${BasePlan}",
+        "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "12000"
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='common-operate']/div/form/div[4]/div/div[2]/div/span/div/div/div",
+        "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "max_scan=75",
+        "value": "2000"
+    },
+    {
+        "command": "select_option",
+        "target": "",
+        "value": "${AUTO}"
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "2000"
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='common-operate']/div[1]/form/div[12]/div/button[1]",
+        "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "7000"
+    },
+    {
+        "command": "click",
+        "target": "xpath=//div[@id='common-operate']/div[2]/div/button",
+        "value": ""
+    }
 ]

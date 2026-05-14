@@ -30,12 +30,14 @@ class BrowserSession:
         download_dir: Optional[Path] = None,
         profile_dir: Optional[Path] = None,
         driver_path: Optional[Path] = None,
+        drivers_dir: Optional[Path] = None,
     ):
         self.browser_type = browser_type.lower()
         self.headless = headless
         self.download_dir = Path(download_dir) if download_dir else Path.home() / "Downloads"
         self.profile_dir = Path(profile_dir) if profile_dir else Path.home() / ".browser_profiles" / browser_type
         self.driver_path = Path(driver_path) if driver_path else None
+        self.drivers_dir = Path(drivers_dir) if drivers_dir else None
         self.driver = None
         self.timeout = 15
 
@@ -47,7 +49,7 @@ class BrowserSession:
         self.profile_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.driver_path:
-            detector = DriverDetector(self.browser_type)
+            detector = DriverDetector(self.browser_type, drivers_dir=self.drivers_dir)
             self.driver_path = detector.get_driver_path()
 
         if self.browser_type == "edge":
@@ -77,7 +79,9 @@ class BrowserSession:
             "download.default_directory": str(self.download_dir),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
+            "download.open_pdf_in_system_reader": False,
             "profile.default_content_setting_values.automatic_downloads": 1,
+            "browser.show_hub_popup_on_download_start": False,
         }
         options.add_experimental_option("prefs", prefs)
 
@@ -98,6 +102,7 @@ class BrowserSession:
         prefs = {
             "download.default_directory": str(self.download_dir),
             "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
         }
         options.add_experimental_option("prefs", prefs)
 
@@ -105,14 +110,36 @@ class BrowserSession:
         self.driver = webdriver.Chrome(service=service, options=options)
 
     def _launch_firefox(self) -> None:
-        """Launch Firefox browser."""
+        """Launch Firefox browser.
+
+        Firefox uses profile arguments and about:config prefs for configuration —
+        NOT --user-data-dir (that is a Chromium-only argument which causes Firefox
+        to fail silently or error).
+        """
         options = FirefoxOptions()
         if self.headless:
             options.add_argument("--headless")
 
+        # Download preferences via about:config
         options.set_preference("browser.download.dir", str(self.download_dir))
-        options.set_preference("browser.download.folderList", 2)
+        options.set_preference("browser.download.folderList", 2)  # 2 = custom dir
         options.set_preference("browser.download.manager.showWhenStarting", False)
+        options.set_preference("browser.download.useDownloadDir", True)
+        options.set_preference(
+            "browser.helperApps.neverAsk.saveToDisk",
+            "application/octet-stream,application/zip,text/csv,"
+            "application/vnd.ms-excel,"
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        # Persistent profile directory (Firefox-compatible way)
+        self.profile_dir.mkdir(parents=True, exist_ok=True)
+        options.add_argument("-profile")
+        options.add_argument(str(self.profile_dir))
+
+        # Window size (Firefox uses these args instead of --window-size)
+        options.add_argument("--width=1920")
+        options.add_argument("--height=1080")
 
         service = FirefoxService(executable_path=str(self.driver_path))
         self.driver = webdriver.Firefox(service=service, options=options)
