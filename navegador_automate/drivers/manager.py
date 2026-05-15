@@ -78,21 +78,73 @@ def _get_drivers_dir() -> Path:
 
 
 class DriverManager:
-    """Manage WebDriver binaries for Edge, Chrome, Firefox."""
+    """
+    Gestor de binarios de WebDriver con descarga y cacheo automático.
 
-    def __init__(self, browser: str, drivers_dir: Optional[Path] = None):
+    Descarga los drivers necesarios (msedgedriver.exe, chromedriver, etc.)
+    los valida y los cachea para evitar descargas repetidas.
+    """
+
+    def __init__(self, browser: str, drivers_dir: Optional[Path] = None) -> None:
+        """
+        Inicializar el gestor de WebDriver.
+
+        Args:
+            browser: Tipo de navegador ("edge", "chrome", "firefox")
+            drivers_dir: Directorio para almacenar drivers.
+                        Si None, usa detección automática.
+        """
         self.browser = browser.lower()
         self.system = platform.system()
         self._drivers_dir = drivers_dir
 
     @property
     def drivers_dir(self) -> Path:
+        """
+        Obtener el directorio donde se almacenan o cachean binarios de WebDriver.
+
+        Prioridad de resolución:
+            1. Directorio configurado explícitamente via constructor
+            2. Directorio raíz del proyecto detectado + '/drivers'
+            3. Fallback a directorio de datos del usuario por plataforma:
+               - Windows: %APPDATA%/navegador-automate/drivers
+               - Linux: ~/.local/share/navegador-automate/drivers
+               - macOS: ~/Library/Application Support/navegador-automate/drivers
+
+        Returns:
+            Path: Ruta del directorio para almacenar drivers
+
+        Note:
+            El directorio se crea automáticamente si no existe.
+
+        Example:
+            >>> manager = DriverManager("edge")
+            >>> print(manager.drivers_dir)
+            PosixPath('/home/user/proyecto/drivers')
+        """
         if self._drivers_dir is not None:
             return self._drivers_dir
         return _get_drivers_dir()
 
     def get_driver_path(self) -> Path:
-        """Get or download the appropriate WebDriver."""
+        """
+        Obtener ruta al ejecutable del WebDriver.
+
+        Descarga el driver si no está presente, valida su versión
+        y retorna la ruta completa al ejecutable.
+
+        Returns:
+            Path: Ruta al ejecutable del WebDriver
+
+        Raises:
+            RuntimeError: Si no se puede descargar o validar el driver
+
+        Example:
+            >>> manager = DriverManager("chrome")
+            >>> path = manager.get_driver_path()
+            >>> print(path)
+            PosixPath('/drivers/chromedriver')
+        """
         if self.browser == "edge":
             return self._get_edge_driver()
         elif self.browser == "chrome":

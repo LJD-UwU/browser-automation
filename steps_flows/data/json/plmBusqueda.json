@@ -53,5 +53,10 @@
         "command": "click",
         "target": "id=action_NewOpen",
         "value": ""
+    },
+    {
+        "command": "pause",
+        "target": "",
+        "value": "100000"
     }
 ]

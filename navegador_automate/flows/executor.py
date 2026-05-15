@@ -5,6 +5,10 @@ Variables ${KEY} en los pasos JSON se resuelven desde:
   2. credentials= pasado a FlowOrchestrator  (override en runtime)
 
 Las credenciales pasadas directamente tienen prioridad sobre config.py.
+
+Ejemplo:
+    >>> executor = Executor(browser, "basePlan", variables={"url": "..."})
+    >>> executor.execute_file("steps.json")
 """
 
 import json
@@ -12,12 +16,13 @@ import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Tuple
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.remote.webelement import WebElement
 
 from navegador_automate.utils.logger import log
 
@@ -87,15 +92,41 @@ def _resolve_best_option(options: list, reference: datetime = None) -> str:
 # ── Executor ──────────────────────────────────────────────────────────────────
 
 class Executor:
-    """Execute automation steps from JSON files."""
+    """
+    Ejecutor de pasos de automatización definidos en JSON.
 
-    def __init__(self, browser_session, name: str, variables: Dict[str, str] = None):
+    Procesa comandos como click, fill, select, wait, etc. resolviendo
+    variables de configuración y manejando excepciones automáticamente.
+
+    Atributos:
+        session: BrowserSession conectada
+        name: Nombre del flujo (para logging)
+        variables: Dict de variables ${KEY} para resolución
+        timeout: Timeout por defecto para esperas (segundos)
+    """
+
+    def __init__(
+        self,
+        browser_session: "BrowserSession",
+        name: str,
+        variables: Optional[Dict[str, str]] = None
+    ) -> None:
         """
+        Inicializar el ejecutor de flujo.
+
         Args:
-            browser_session: BrowserSession instance
-            name: Nombre del flujo (para logs)
-            variables: Variables ${KEY} — se combinan con config.json.
-                       Las variables aquí pasadas tienen prioridad sobre config.json.
+            browser_session: Instancia de BrowserSession conectada
+            name: Nombre descriptivo del flujo (para logs)
+            variables: Variables ${KEY} que se resuelven en pasos JSON.
+                      Se combinan con config.json con prioridad a estas.
+                      Defaults to None.
+
+        Example:
+            >>> executor = Executor(
+            ...     browser,
+            ...     "plmBusqueda",
+            ...     variables={"search_term": "ABC123"}
+            ... )
         """
         self.session = browser_session
         self.name = name
@@ -110,8 +141,26 @@ class Executor:
 
     # ── Ejecución de archivos ─────────────────────────────────────────────────
 
-    def execute_file(self, json_path) -> None:
-        """Execute all steps from JSON file."""
+    def execute_file(self, json_path: str | Path) -> None:
+        """
+        Ejecutar todos los pasos definidos en un archivo JSON.
+
+        Lee un archivo JSON que contiene una lista de pasos de automatización,
+        procesa cada uno en orden y detiene si ocurre un error.
+
+        Args:
+            json_path: Ruta al archivo JSON con los pasos a ejecutar.
+                      Puede ser string o Path object.
+
+        Raises:
+            FileNotFoundError: Si el archivo JSON no existe
+            json.JSONDecodeError: Si el archivo no es JSON válido
+            Exception: Si hay error al ejecutar algún paso (con índice)
+
+        Example:
+            >>> executor.execute_file("steps/login.json")
+            >>> executor.execute_file(Path("steps") / "search.json")
+        """
         json_path = Path(json_path)
         if not json_path.exists():
             raise FileNotFoundError(f"JSON file not found: {json_path}")
@@ -236,8 +285,31 @@ class Executor:
                 return
         raise Exception(f"No se encontró el día {target_date.day} en el calendario Arco")
 
-    def select_arco_date(self, selector: str, date_input: str):
-        """Selecciona fecha en calendario Arco. date_input = 'YYYY-MM-DD' o '__AUTO__'."""
+    def select_arco_date(self, selector: str, date_input: str) -> None:
+        """
+        Seleccionar fecha en widget de calendario Arco.
+
+        Localiza el popup de calendario, navega al mes/año correcto
+        y selecciona el día especificado.
+
+        Args:
+            selector: Selector en formato "xpath=...", "css=...", etc.
+                     para localizar el campo/popup del calendario
+            date_input: Fecha en formato "YYYY-MM-DD" o "__AUTO__"
+                       para seleccionar el día hábil anterior
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Si el calendario no aparece o no se encuentra la fecha
+
+        Example:
+            >>> executor.select_arco_date(
+            ...     "xpath=//div[contains(@class,'arco-picker')]",
+            ...     "2026-05-15"
+            ... )
+        """
         if date_input == "__AUTO__":
             target_date = _previous_working_day()
             log(self.name, f"AUTO calendario → {target_date.strftime('%Y-%m-%d')}")
@@ -274,8 +346,25 @@ class Executor:
         except Exception:
             self.session.driver.execute_script("arguments[0].click();", el)
 
-    def select_ant_option(self, option_text: str):
-        """Selecciona opción del dropdown Ant Design por texto exacto."""
+    def select_ant_option(self, option_text: str) -> None:
+        """
+        Seleccionar opción específica de dropdown Ant Design por texto.
+
+        Busca el dropdown visible, localiza la opción con el texto exacto
+        y la selecciona.
+
+        Args:
+            option_text: Texto exacto de la opción a seleccionar
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Si el dropdown no se encuentra o la opción no existe
+
+        Example:
+            >>> executor.select_ant_option("Production")
+        """
         log(self.name, f"Seleccionando opción: '{option_text}'")
         menu = self._get_ant_menu()
         if menu is None:
@@ -292,8 +381,25 @@ class Executor:
                 raise Exception(f"Opción '{option_text}' no encontrada. Disponibles: {sample}")
         self._click_option_el(el)
 
-    def select_ant_option_auto(self, max_scan: int = 50):
-        """Selecciona la opción más reciente (anterior a hoy) del dropdown Ant Design."""
+    def select_ant_option_auto(self, max_scan: int = 50) -> None:
+        """
+        Seleccionar automáticamente la opción más reciente del dropdown.
+
+        Busca la opción con la fecha más reciente anterior a hoy
+        entre los primeros max_scan elementos.
+
+        Args:
+            max_scan: Máximo número de opciones a escanear. Defaults to 50.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Si el dropdown no se encuentra o no hay opciones válidas
+
+        Example:
+            >>> executor.select_ant_option_auto(max_scan=30)
+        """
         log(self.name, f"Resolviendo opción automáticamente (max_scan={max_scan})…")
         menu = self._get_ant_menu()
         if menu is None:
@@ -314,12 +420,32 @@ class Executor:
 
     # ── Wait for Element ──────────────────────────────────────────────────────
 
-    def wait_for_element_present(self, selector: str, timeout: int = None):
-        """Espera a que un elemento esté presente en el DOM (existe pero puede no ser visible).
+    def wait_for_element_present(
+        self,
+        selector: str,
+        timeout: Optional[int] = None
+    ) -> bool:
+        """
+        Esperar a que un elemento esté presente en el DOM.
+
+        Bloquea la ejecución hasta que el elemento localizado
+        sea encontrado en el árbol del DOM, o hasta timeout.
 
         Args:
-            selector: selector en formato "xpath=...", "id=...", "css=...", etc.
-            timeout: segundos para esperar (default: self.timeout)
+            selector: Selector en formato "xpath=...", "css=...", "id=...", etc.
+            timeout: Máximo de segundos a esperar. Si None, usa self.timeout.
+
+        Returns:
+            bool: True si elemento encontrado
+
+        Raises:
+            Exception: Si timeout se alcanza sin encontrar el elemento
+
+        Example:
+            >>> executor.wait_for_element_present(
+            ...     "xpath=//div[@id='loader']",
+            ...     timeout=15
+            ... )
         """
         if timeout is None:
             timeout = self.timeout
@@ -331,12 +457,14 @@ class Executor:
         try:
             wait.until(EC.presence_of_element_located((by, value)))
             log(self.name, f"Elemento encontrado: {selector}", level="debug")
+            return True
         except Exception as e:
             raise Exception(f"waitForElementPresent timeout ({timeout}s): {selector}\n{e}")
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _is_variable(self, text: str) -> bool:
+        """Verificar si una cadena es una variable ${KEY}."""
         return isinstance(text, str) and text.startswith("${") and text.endswith("}")
 
     def _replace(self, text: str) -> str:
@@ -359,7 +487,13 @@ class Executor:
             )
         return self.variables[key]
 
-    def _parse_selector(self, selector: str):
+    def _parse_selector(self, selector: str) -> Tuple[str, str]:
+        """
+        Parsear selector en formato prefijado y retornar tupla (By, value).
+
+        Soporta formatos: xpath=..., css=..., id=..., name=...
+        Si no tiene prefijo, asume XPATH.
+        """
         if selector.startswith("xpath="):
             return By.XPATH, selector[6:]
         if selector.startswith("css="):
