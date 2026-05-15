@@ -40,9 +40,14 @@
         "value":""
     },
     {
-        "command": "click",
-        "target": "xpath=//div[@id='table']/div/div[2]/div/div/div/div/div/span",
+        "command": "waitForElementPresent",
+        "target": "xpath=//div[@id='table']",
         "value": ""
+    },
+    {
+        "command": "find_and_expand_table_row",
+        "target": "xpath=//div[@id='table']",
+        "value": "LCD|Revision"
     },
     {
         "command": "waitForElementPresent",
@@ -57,6 +62,6 @@
     {
         "command": "pause",
         "target": "",
-        "value": "100000"
+        "value": "10000"
     }
 ]

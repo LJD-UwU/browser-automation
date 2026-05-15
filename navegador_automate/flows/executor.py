@@ -25,6 +25,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.remote.webelement import WebElement
 
 from navegador_automate.utils.logger import log
+from navegador_automate.browser.session import BrowserSession
 
 
 # ── Carga de configuración desde steps_flows/config.py ───────────────────────
@@ -107,7 +108,7 @@ class Executor:
 
     def __init__(
         self,
-        browser_session: "BrowserSession",
+        browser_session: BrowserSession,
         name: str,
         variables: Optional[Dict[str, str]] = None
     ) -> None:
@@ -244,6 +245,13 @@ class Executor:
             else:
                 self.select_ant_option(option_text=resolved_value)
 
+        elif command == "find_and_expand_table_row":
+            # target = xpath de tabla, value = "PATRON|COLUMNA_SORT"
+            parts = value.split("|")
+            search_pattern = parts[0] if len(parts) > 0 else ""
+            sort_column = parts[1] if len(parts) > 1 else None
+            self.find_and_expand_table_row(target, "Type", search_pattern, sort_column)
+
         else:
             log(self.name, f"Unknown command: {command}", level="warning")
 
@@ -321,6 +329,249 @@ class Executor:
         self._click_arco_day(popup, target_date)
         log(self.name, f"Fecha seleccionada: {target_date.strftime('%Y-%m-%d')}")
 
+    def find_and_expand_table_row(self, table_selector: str,
+                            search_column: str, search_pattern: str,
+                            sort_column: str = None) -> None:
+        """Busca filas en tabla WUX y expande la más reciente."""
+        by, value = self._parse_selector(table_selector)
+        
+        log(self.name, "⏳ Esperando carga de tabla (max 60s)...", level="info")
+        
+        max_wait = 60
+        start_time = time.time()
+        table = None
+        left_rows_count = 0
+        
+        while time.time() - start_time < max_wait:
+            try:
+                table = self.session.driver.find_element(by, value)
+                left_rows = table.find_elements(By.XPATH,
+                    ".//div[contains(@class, 'wux-layouts-left-poolcontainer')]//div[contains(@class, 'wux-layouts-datagridview-row')]")
+                left_rows_count = len(left_rows)
+                
+                if left_rows_count > 0:
+                    log(self.name, f"✓ Tabla lista: {left_rows_count} filas detectadas", level="info")
+                    break
+                else:
+                    elapsed = int(time.time() - start_time)
+                    log(self.name, f"  Esperando... ({elapsed}s) - filas: {left_rows_count}", level="debug")
+                    time.sleep(1)
+            except Exception as e:
+                elapsed = int(time.time() - start_time)
+                log(self.name, f"  Esperando ({elapsed}s)...", level="debug")
+                time.sleep(1)
+        
+        if not table or left_rows_count == 0:
+            self._save_table_html(table)
+            raise Exception(f"Tabla no cargó después de {max_wait}s")
+        
+        # ========== HEADERS ==========
+        log(self.name, "▶ Leyendo headers...", level="info")
+        
+        header_cells = table.find_elements(By.XPATH,
+            ".//div[contains(@class, 'wux-layouts-header')]//div[contains(@class, 'wux-layouts-datagridview-column-header-cell')][@is-visible='true']")
+        
+        if not header_cells:
+            self._save_table_html(table)
+            raise Exception("No se encontraron headers")
+        
+        headers_with_pos = []
+        for hc in header_cells:
+            style = hc.get_attribute("style") or ""
+            left_match = re.search(r'(?:transform: translate3d\((\d+)px|left:\s*(\d+)px)', style)
+            if left_match:
+                left_pos = int(left_match.group(1) or left_match.group(2) or 0)
+            else:
+                left_pos = 0
+            
+            tweaker = hc.find_element(By.XPATH, ".//div[contains(@class, 'wux-tweakers')]")
+            header_name = tweaker.text.strip()
+            headers_with_pos.append((left_pos, header_name))
+        
+        headers_with_pos.sort(key=lambda x: x[0])
+        headers = [h[1] for h in headers_with_pos]
+        
+        log(self.name, f"  Headers ({len(headers)}): {headers}", level="info")
+        
+        column_index = None
+        for i, header_text in enumerate(headers):
+            if search_column.lower() in header_text.lower():
+                column_index = i
+                break
+        
+        if column_index is None:
+            self._save_table_html(table)
+            raise Exception(f"Columna '{search_column}' no encontrada en {headers}")
+        
+        # IMPORTANTE: Los headers incluyen "Title" en posición 0 (left panel)
+        # Pero los datos de filas NO incluyen Title (está separado en left panel)
+        # Por eso los datos tienen 11 columnas, headers tiene 12
+        # Restamos 1 al índice para coincidir con los datos
+        data_column_index = column_index - 1
+        
+        if sort_column is None:
+            sort_column = "Revision"
+        
+        sort_index = None
+        for i, header_text in enumerate(headers):
+            if sort_column.lower() in header_text.lower():
+                sort_index = i
+                break
+        
+        if sort_index is None:
+            log(self.name, f"  ⚠ Columna sort '{sort_column}' no encontrada", level="warning")
+            sort_index = data_column_index
+        
+        # Restar 1 también del sort_index
+        data_sort_index = sort_index - 1
+        
+        log(self.name, f"  Buscando en columna {column_index} ('{search_column}') → datos índice {data_column_index}", level="info")
+        log(self.name, f"  Ordenando por columna {sort_index} ('{sort_column}') → datos índice {data_sort_index}", level="info")
+        
+        # ========== LEFT PANEL ==========
+        log(self.name, "▶ Leyendo primera columna (left panel)...", level="info")
+        
+        left_rows = table.find_elements(By.XPATH,
+            ".//div[contains(@class, 'wux-layouts-left-poolcontainer')]//div[contains(@class, 'wux-layouts-datagridview-row')]")
+        
+        log(self.name, f"  Filas en left panel: {len(left_rows)}", level="info")
+        
+        if not left_rows:
+            self._save_table_html(table)
+            raise Exception("No se encontraron filas en left panel")
+        
+        # ========== GRIDENGINE PANEL ==========
+        log(self.name, "▶ Leyendo datos (gridengine panel)...", level="info")
+        
+        data_rows = table.find_elements(By.XPATH,
+            ".//div[contains(@class, 'wux-layouts-gridengine-poolcontainer-rel')]//div[contains(@class, 'wux-layouts-datagridview-row')]")
+        
+        log(self.name, f"  Filas en gridengine: {len(data_rows)}", level="info")
+        
+        if not data_rows:
+            self._save_table_html(table)
+            raise Exception("No se encontraron filas en gridengine panel")
+        
+        num_rows = len(left_rows)
+        
+        # ========== RECONSTRUIR ==========
+        log(self.name, f"▶ Reconstruyendo tabla ({num_rows} filas × {len(headers)} columnas)...", level="info")
+        
+        table_data = []
+        
+        for row_idx in range(min(num_rows, len(data_rows))):
+            data_row = data_rows[row_idx]
+            all_cells = data_row.find_elements(By.XPATH,
+                ".//div[contains(@class, 'wux-layouts-datagridview-cell')]")
+            
+            cells_with_pos = []
+            for cell in all_cells:
+                style = cell.get_attribute("style") or ""
+                # Buscar tanto "left:" como "transform: translate3d"
+                left_match = re.search(r'(?:transform: translate3d\((\d+)px|left:\s*(\d+)px)', style)
+                if left_match:
+                    left_pos = int(left_match.group(1) or left_match.group(2) or 0)
+                else:
+                    left_pos = 0
+                
+                text = cell.text.strip()
+                cells_with_pos.append((left_pos, text))
+            
+            cells_with_pos.sort(key=lambda x: x[0])
+            row_values = [text for _, text in cells_with_pos]
+            
+            table_data.append(row_values)
+        
+        # ========== MOSTRAR TABLA ==========
+        log(self.name, f"✓ Tabla reconstruida ({len(table_data)} filas):", level="info")
+        for i, row in enumerate(table_data):
+            log(self.name, f"  Fila {i}: {row}", level="debug")
+        
+        # ========== GUARDAR HTML ==========
+        self._save_table_html(table)
+        
+        # ========== BUSCAR ==========
+        log(self.name, f"▶ Buscando patrón '{search_pattern}' en columna {column_index} ('{search_column}')...", level="info")
+        
+        matching_rows = []
+        for row_idx, row in enumerate(table_data):
+            if data_column_index < len(row):
+                cell_value = row[data_column_index].lower()
+                log(self.name, f"  Fila {row_idx}, col {data_column_index}: '{cell_value}'", level="debug")
+                if search_pattern.lower() in cell_value:
+                    matching_rows.append((row_idx, row))
+                    sort_val = row[data_sort_index] if data_sort_index < len(row) else "N/A"
+                    log(self.name, f"    ✓ COINCIDENCIA: '{row[data_column_index]}' (revision: {sort_val})", level="info")
+        
+        if not matching_rows:
+            raise Exception(f"No hay filas con '{search_pattern}' en columna '{search_column}'")
+        
+        # ========== ORDENAR ==========
+        log(self.name, f"▶ Ordenando {len(matching_rows)} coincidencias por '{sort_column}'...", level="info")
+        
+        def parse_sort_value(value: str):
+            """Parsea valores de revisión como 'A.1', 'A.2', 'B.1', etc."""
+            match = re.match(r'([A-Z]+)\.(\d+)', value)
+            if match:
+                letter = match.group(1)
+                number = int(match.group(2))
+                letter_val = ord(letter[0]) * 100 + (ord(letter[-1]) if len(letter) > 1 else 0)
+                return (letter_val, number)
+            try:
+                return (0, int(value))
+            except:
+                return (0, 0)
+        
+        matching_rows.sort(
+            key=lambda x: parse_sort_value(x[1][data_sort_index]),
+            reverse=True
+        )
+        
+        for i, (row_idx, row) in enumerate(matching_rows):
+            sort_val = row[data_sort_index]
+            msg = f"  {i+1}. Fila {row_idx}: {sort_val}"
+            if i == 0:
+                msg += " (más reciente)"
+            log(self.name, msg, level="info")
+        
+        # ========== EXPANDIR ==========
+        selected_row_idx = matching_rows[0][0]
+        selected_row = matching_rows[0][1]
+        sort_val = selected_row[data_sort_index]
+        
+        log(self.name, f"▶ Expandiendo fila {selected_row_idx} (versión {sort_val})...", level="info")
+        
+        expand_icon = left_rows[selected_row_idx].find_element(By.XPATH,
+            ".//span[contains(@class, 'fonticon-down-open')]")
+        
+        self.session.driver.execute_script("arguments[0].click();", expand_icon)
+        log(self.name, f"✓ Fila {selected_row_idx} expandida ('{selected_row[data_column_index]}' v{sort_val})", level="info")
+
+
+    def _save_table_html(self, table_element) -> None:
+        """Guarda el HTML completo de la tabla en la raíz del proyecto."""
+        try:
+            import os
+            from datetime import datetime
+            
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(os.path.dirname(script_dir))
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = os.path.join(project_root, f"table_debug_{timestamp}.html")
+            
+            if table_element:
+                html_content = table_element.get_attribute("outerHTML")
+            else:
+                html_content = self.session.driver.page_source
+            
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            
+            log(self.name, f"💾 HTML guardado: {output_file}", level="info")
+        except Exception as e:
+            log(self.name, f"⚠ No se pudo guardar HTML: {e}", level="warning")
+
     # ── Dropdown Ant Design ───────────────────────────────────────────────────
 
     def _get_ant_menu(self):
@@ -371,7 +622,7 @@ class Executor:
             raise Exception("No se encontró ant-select-dropdown-menu")
         try:
             xpath = (f".//li[contains(@class,'ant-select-dropdown-menu-item') "
-                     f"and normalize-space(text())='{option_text}']")
+                        f"and normalize-space(text())='{option_text}']")
             el = menu.find_element(By.XPATH, xpath)
         except Exception:
             items = menu.find_elements(By.CSS_SELECTOR, "li.ant-select-dropdown-menu-item")
@@ -405,8 +656,8 @@ class Executor:
         if menu is None:
             raise Exception("No se encontró ant-select-dropdown-menu")
         xpath = (f"(//ul[contains(@class,'ant-select-dropdown-menu')]"
-                 f"//li[contains(@class,'ant-select-dropdown-menu-item')])"
-                 f"[position() <= {max_scan}]")
+                    f"//li[contains(@class,'ant-select-dropdown-menu-item')])"
+                    f"[position() <= {max_scan}]")
         items = self.session.driver.find_elements(By.XPATH, xpath)
         if not items:
             items = menu.find_elements(By.CSS_SELECTOR, "li.ant-select-dropdown-menu-item")[:max_scan]
